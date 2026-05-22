@@ -60,11 +60,10 @@ export const userSignUp = async (req, res) => {
       message: "User created successfully",
       user: createdUser,
       activeToken,
-      refreshToken,
     });
   } catch (error) {
     return res.status(500).json({
-      message: "Something went wrong in userSignIn function",
+      message: "Something went wrong in userSignUp function",
       error: error.message,
     });
   }
@@ -106,7 +105,7 @@ export const userSignIn = async (req, res) => {
 
     return res.status(200).json({
       message: "User logged in",
-      userData: userExists,
+      userData: userData,
       activeToken,
     });
   } catch (error) {
