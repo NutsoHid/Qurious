@@ -1,9 +1,15 @@
+//windows network issue ig
+import { promises as dnsPromises } from "node:dns";
+// Explicitly force Node.js to use Cloudflare and Google DNS for its internal lookups
+dnsPromises.setServers(["1.1.1.1", "8.8.8.8"]);
+
 import express from "express";
 import dotenv from "dotenv";
 import "dotenv/config";
 import connect from "./config/db.config.js";
 import Userrouter from "./routes/user.routes.js";
 import postRouter from "./routes/post.route.js";
+import commentRouter from "./Routes/comment.route.js";
 
 const app = express();
 
@@ -11,6 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/user", Userrouter);
 app.use("api/post", postRouter);
+app.use("/api/comment", commentRouter);
 
 app.listen(process.env.PORT, (req, res) => {
   connect()
