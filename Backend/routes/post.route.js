@@ -11,7 +11,7 @@ import {
 const postRouter = express.Router();
 
 postRouter.post("/upload", verifyJWT, uploadPost);
-postRouter.get("/singlePost/:id", verifyJWT, getOnePost);
+postRouter.get("/singlePost/:id", getOnePost);
 postRouter.get("/allPost", getAllPost);
 postRouter.delete("/deletPost/:id", verifyJWT, deletePost);
 postRouter.put("/editPost/:id", verifyJWT, editPost);
