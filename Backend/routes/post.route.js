@@ -12,7 +12,7 @@ const postRouter = express.Router();
 
 postRouter.post("/upload", verifyJWT, uploadPost);
 postRouter.get("/singlePost/:id", verifyJWT, getOnePost);
-postRouter.get("/allPost", verifyJWT, getAllPost);
+postRouter.get("/allPost", getAllPost);
 postRouter.delete("/deletPost/:id", verifyJWT, deletePost);
 postRouter.put("/editPost/:id", verifyJWT, editPost);
 

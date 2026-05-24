@@ -59,7 +59,7 @@ export const getComment = async (req, res) => {
 
 export const getAllComment = async (req, res) => {
   try {
-    const { postId } = req.params;
+    const { postId } = req.paraaudaims;
     if (!postId) {
       return res.status(400).json({ message: "Post ID is required" });
     }
