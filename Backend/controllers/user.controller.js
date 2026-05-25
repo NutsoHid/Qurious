@@ -74,7 +74,7 @@ export const userSignIn = async (req, res) => {
     const { userName, email, password } = req.body;
 
     if (!password || (!email && !userName)) {
-      return res.status(400).json({ message: "Incomplete credientials" });
+      return res.status(400).json({ message: "Incomplete credentials" });
     }
 
     let userExists = userName
@@ -98,7 +98,6 @@ export const userSignIn = async (req, res) => {
 
     await userExists.save({ validateBeforeSave: false });
 
-    // const user = await User.findOne({email}).select("-password -refreshToken")
     const userData = userExists.toObject();
     delete userData.password;
     delete userData.refreshToken;
@@ -116,4 +115,100 @@ export const userSignIn = async (req, res) => {
   }
 };
 
-export default { userSignUp, userSignIn };
+export const getCurrentUser = async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: "Unauthorized request" });
+    }
+
+    const userExists = await User.findById(req.userId);
+
+    if (!userExists) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userData = userExists.toObject();
+    delete userData.password;
+    delete userData.refreshToken;
+
+    return res.status(200).json({
+      message: "Current user retrieved successfully",
+      user: userData,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong in getCurrentUser",
+      error: error.message,
+    });
+  }
+};
+
+export const getUserProfile = async (req, res) => {
+  try {
+    const { userName } = req.params;
+
+    if (!userName) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    const userExists = await User.findOne({ userName });
+
+    if (!userExists) {
+      return res.status(404).json({ message: "Profile not found" });
+    }
+
+    const profileData = userExists.toObject();
+    delete profileData.password;
+    delete profileData.refreshToken;
+
+    return res.status(200).json({
+      message: "User profile retrieved successfully",
+      profile: profileData,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong in getUserProfile",
+      error: error.message,
+    });
+  }
+};
+
+export const getAllUsers = async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = {};
+
+    if (search) {
+      query = {
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { userName: { $regex: search, $options: "i" } },
+          { profession: { $regex: search, $options: "i" } },
+        ],
+      };
+    }
+
+    const users = await User.find(query)
+      .find({ _id: { $ne: req.userId } })
+      .select("-password -refreshToken")
+      .limit(20);
+
+    return res.status(200).json({
+      message: "Discovery users list retrieved successfully",
+      users: users,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong in getAllUsers",
+      error: error.message,
+    });
+  }
+};
+
+export default {
+  userSignUp,
+  userSignIn,
+  getCurrentUser,
+  getUserProfile,
+  getAllUsers,
+};
