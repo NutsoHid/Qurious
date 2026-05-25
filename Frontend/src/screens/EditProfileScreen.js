@@ -10,71 +10,56 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EditProfileScreen() {
   const navigation = useNavigation();
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
 
   const [name, setName] = useState(user?.name || '');
   const [userName, setUserName] = useState(user?.userName || '');
-  const [oldPassword, setOldPassword] = useState('');
-  const [password, setPassword] = useState('');
+  const [profession, setProfession] = useState(user?.profession || '');
   const [image, setImage] = useState(user?.profileUrl || null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImagePicker = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // FIX 1: Clears the yellow warning
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-    
-    // FIX 2: assets is an array, you must use
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setImage(result.assets.uri);
     }
   };
 
   const handleSave = async () => {
-    if (password && !oldPassword) {
-      Alert.alert("Error", "Please enter your current password to set a new one.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      
       formData.append('name', name);
       formData.append('userName', userName);
-      
-      if (password && oldPassword) {
-        formData.append('password', password);
-        formData.append('oldPassword', oldPassword);
-      }
+      formData.append('profession', profession);
 
       if (image && image !== user?.profileUrl) {
         let filename = image.split('/').pop();
         let match = /\.(\w+)$/.exec(filename);
         let type = match ? `image/${match[1]}` : `image/jpeg`;
-        
-        formData.append('profileUrl', { 
+        formData.append('profileImage', { 
           uri: image, 
-          name: filename, 
+          name: filename || 'avatar.jpg', 
           type: type 
         });
       }
 
       const token = await AsyncStorage.getItem('userToken');
-      const baseURL = api.defaults.baseURL; // Dynamically grab your IP from api.js
+      const baseURL = api.defaults.baseURL;
 
-      // FIX 3: Bulletproof Fetch bypassing Axios for file uploads
+      // Note: Make sure your friend has an active /user/update-profile route!
       const response = await fetch(`${baseURL}/user/update-profile`, {
         method: 'POST',
         body: formData,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
-          // NO CONTENT-TYPE HEADER! Fetch adds the boundary automatically.
         },
       });
 
@@ -84,10 +69,16 @@ export default function EditProfileScreen() {
         throw new Error(responseData.message || "Failed to update profile");
       }
 
-      Alert.alert("Success", "Profile updated successfully!");
+      // Globally update the app UI
+      if (responseData.user) {
+        setUser(responseData.user);
+        await AsyncStorage.setItem('userData', JSON.stringify(responseData.user));
+      }
+
+      Alert.alert("Success", "Profile updated perfectly!");
       navigation.goBack();
     } catch (error) {
-      console.error("Upload Error:", error);
+      console.error("Update Error:", error);
       Alert.alert("Error", error.message || "Could not save changes");
     } finally {
       setIsSubmitting(false);
@@ -98,16 +89,16 @@ export default function EditProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} disabled={isSubmitting}>
-          <Ionicons name="close-outline" size={32} color="#000" />
+          <Ionicons name="close-outline" size={32} color="#1a1a1a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit profile</Text>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
         <TouchableOpacity onPress={handleSave} disabled={isSubmitting}>
           {isSubmitting ? <ActivityIndicator color="#0088cc" /> : <Ionicons name="checkmark" size={32} color="#0088cc" />}
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           <View style={styles.avatarContainer}>
             <TouchableOpacity onPress={handleImagePicker} style={styles.avatarBox}>
@@ -116,42 +107,23 @@ export default function EditProfileScreen() {
                 <Ionicons name="camera" size={18} color="#fff" />
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setImage(null)}>
-              <Text style={styles.removeText}>Remove photo</Text>
-            </TouchableOpacity>
+            <Text style={styles.changePhotoText}>Edit picture</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Name</Text>
-              <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" />
+              <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your full name" />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Username</Text>
-              <TextInput style={styles.input} value={userName} onChangeText={setUserName} placeholder="Your username" autoCapitalize="none" />
+              <TextInput style={styles.input} value={userName} onChangeText={setUserName} placeholder="username" autoCapitalize="none" />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Current Password</Text>
-              <TextInput 
-                style={styles.input} 
-                value={oldPassword} 
-                onChangeText={setOldPassword} 
-                placeholder="Required to change password" 
-                secureTextEntry 
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>New Password</Text>
-              <TextInput 
-                style={styles.input} 
-                value={password} 
-                onChangeText={setPassword} 
-                placeholder="Leave blank to keep current" 
-                secureTextEntry 
-              />
+              <Text style={styles.label}>Profession</Text>
+              <TextInput style={styles.input} value={profession} onChangeText={setProfession} placeholder="What do you do?" />
             </View>
           </View>
           
@@ -164,15 +136,15 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#000' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#1a1a1a' },
   scrollContent: { paddingBottom: 40 },
-  avatarContainer: { alignItems: 'center', marginTop: 30, marginBottom: 20 },
+  avatarContainer: { alignItems: 'center', marginTop: 30, marginBottom: 30 },
   avatarBox: { position: 'relative' },
-  avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#eee' },
+  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#eee', borderWidth: 1, borderColor: '#ddd' },
   cameraIcon: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#0088cc', borderRadius: 16, padding: 6, borderWidth: 3, borderColor: '#fff' },
-  removeText: { color: '#ff4444', marginTop: 15, fontSize: 16, fontWeight: '600' },
-  form: { paddingHorizontal: 20, marginTop: 10 },
-  inputGroup: { marginBottom: 25, borderBottomWidth: 1, borderBottomColor: '#e0e0e0', paddingBottom: 5 },
-  label: { color: '#888', fontSize: 12, fontWeight: '600', marginBottom: 5 },
-  input: { fontSize: 16, color: '#000', paddingVertical: 5 },
+  changePhotoText: { color: '#0088cc', marginTop: 12, fontSize: 16, fontWeight: '700' },
+  form: { paddingHorizontal: 25 },
+  inputGroup: { marginBottom: 25, borderBottomWidth: 1, borderBottomColor: '#e0e0e0', paddingBottom: 8 },
+  label: { color: '#888', fontSize: 13, fontWeight: '600', marginBottom: 5 },
+  input: { fontSize: 16, color: '#1a1a1a', paddingVertical: 0 },
 });

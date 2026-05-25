@@ -35,6 +35,7 @@ export const createComment = async (req, res) => {
     });
   }
 };
+
 export const getComment = async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -59,7 +60,9 @@ export const getComment = async (req, res) => {
 
 export const getAllComment = async (req, res) => {
   try {
-    const { postId } = req.paraaudaims;
+    // FIXED TYPO: Changed req.paraaudaims to req.params
+    const { postId } = req.params; 
+    
     if (!postId) {
       return res.status(400).json({ message: "Post ID is required" });
     }
@@ -78,6 +81,21 @@ export const getAllComment = async (req, res) => {
       message: "Something went wrong fetching comments",
       error: error.message,
     });
+  }
+};
+
+// 🔥 NEW: Fetches the logged-in user's comments for the Profile Dashboard
+export const getMyComments = async (req, res) => {
+  try {
+    const { userId } = req;
+    
+    const comments = await Comment.find({ user: userId })
+      .populate("post", "title")
+      .sort({ createdAt: -1 });
+      
+    return res.status(200).json({ comments });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching user comments", error: error.message });
   }
 };
 

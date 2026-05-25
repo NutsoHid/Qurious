@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, FlatList, ActivityIndicator, RefreshControl, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomHeader from '../components/CustomHeader';
+import CustomDrawer from '../components/CustomDrawer'; // 🔥 IMPORT YOUR CUSTOM DRAWER
 import PostCard from '../components/PostCard';
 import api from '../services/api';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // 🔥 DRAWER STATE CONTROLLER
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false); 
 
   const fetchPosts = async () => {
     try {
       const response = await api.get('/post/allPost');
-      // Set the posts from backend
-      setPosts(response.data.posts);
+      setPosts(response.data.posts || []);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching posts:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -27,25 +30,52 @@ export default function HomeScreen() {
     fetchPosts();
   }, []);
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPosts();
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CustomHeader />
-      {loading ? (
-        <ActivityIndicator size="large" color="#0088cc" />
-      ) : (
-              <FlatList
-        data={posts}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <PostCard 
-            username={item.user?.userName}  // item.user is populated now
-            profileImage={item.user?.profileUrl}
-            caption={item.content}
-            image={item.imageUrl}
-          />
-        )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Set the drawer state to true when the menu button is pressed */}
+      <CustomHeader onMenuPress={() => setIsDrawerVisible(true)} />
+      
+      {/* 🔥 THE CUSTOM DRAWER COMPONENT */}
+      <CustomDrawer 
+        visible={isDrawerVisible} 
+        onClose={() => setIsDrawerVisible(false)} 
+        onSelectCategory={(category) => {
+          // You can use this later to filter posts by category!
+          setIsDrawerVisible(false);
+        }}
       />
+      
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#0088cc" />
+        </View>
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => <PostCard post={item} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0088cc" />
+          }
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
       )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  emptyText: { fontSize: 16, color: '#888', fontWeight: '500' }
+});
