@@ -1,59 +1,52 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons'; 
+import { createStackNavigator } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 
+// Import all your screens
 import HomeScreen from '../screens/HomeScreen';
 import CreateScreen from '../screens/CreateScreen';
-import InboxScreen from '../screens/InboxScreen';
+import NotificationScreen from '../screens/NotificationScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen'; // MUST IMPORT THIS
 
 const Tab = createBottomTabNavigator();
+const ProfileStack = createStackNavigator(); // ADD A STACK JUST FOR PROFILE
+
+// Create a mini-navigator for the Profile section
+function ProfileStackNavigator() {
+  return (
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
+    </ProfileStack.Navigator>
+  );
+}
 
 export default function BottomTabNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false, 
-        
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Create') {
-           
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'Inbox') {
-           
-            iconName = focused ? 'notifications' : 'notifications-outline';
-          } else if (route.name === 'You') {
-            iconName = focused ? 'person-circle' : 'person-circle-outline';
-          }
-
-          return <Ionicons name={iconName} size={26} color={color} />;
-        },
-        
-     
-        tabBarActiveTintColor: '#0088cc',
-        tabBarInactiveTintColor: '#555',  
-        tabBarStyle: {
-          height: 85,         
-          paddingBottom: 25,  
-          paddingTop: 8,
-          backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#eee',
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        }
-      })}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Create" component={CreateScreen} />
-      <Tab.Screen name="Inbox" component={InboxScreen} />
-      <Tab.Screen name="You" component={ProfileScreen} />
+    <Tab.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: '#0088cc' }}>
+      <Tab.Screen 
+        name="HomeTab" 
+        component={HomeScreen} 
+        options={{ tabBarIcon: ({color}) => <Ionicons name="home-outline" size={24} color={color} />, tabBarLabel: 'Home' }} 
+      />
+      <Tab.Screen 
+        name="CreateTab" 
+        component={CreateScreen} 
+        options={{ tabBarIcon: ({color}) => <Ionicons name="add-circle" size={28} color={color} />, tabBarLabel: 'Create' }} 
+      />
+      <Tab.Screen 
+        name="InboxTab" 
+        component={NotificationScreen} 
+        options={{ tabBarIcon: ({color}) => <Ionicons name="notifications-outline" size={24} color={color} />, tabBarLabel: 'Inbox' }} 
+      />
+      {/* USE THE STACK HERE, NOT JUST PROFILESCREEN */}
+      <Tab.Screen 
+        name="YouTab" 
+        component={ProfileStackNavigator} 
+        options={{ tabBarIcon: ({color}) => <Ionicons name="person-circle-outline" size={28} color={color} />, tabBarLabel: 'You' }} 
+      />
     </Tab.Navigator>
   );
 }

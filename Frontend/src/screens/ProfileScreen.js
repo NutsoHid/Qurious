@@ -1,182 +1,109 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context'; 
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import PostCard from '../components/PostCard'; 
-import { DEMO_POSTS, DEMO_USERS } from '../constants/demoData'; 
+import { useNavigation } from '@react-navigation/native'; // 1. IMPORT NAVIGATION
+import { AuthContext } from '../context/AuthContext';
+import api from '../services/api';
+import PostCard from '../components/PostCard';
 
-export default function ProfileScreen({ route }) {
-  const [activeTab, setActiveTab] = useState('Posts'); 
+export default function ProfileScreen() {
+  const navigation = useNavigation(); // 2. INITIALIZE NAVIGATION
+  const { user, logout } = useContext(AuthContext); 
+  const [myPosts, setMyPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const userId = route?.params?.userId || 'rambabu'; 
-  const user = DEMO_USERS[userId];
-  
+  useEffect(() => {
+    const fetchMyPosts = async () => {
+      try {
+        const response = await api.get('/post/allPost');
+        const allPosts = response.data.posts || [];
+        const filtered = allPosts.filter(p => p.user?._id === user?._id);
+        setMyPosts(filtered);
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMyPosts();
+  }, [user?._id]);
 
-  const isMe = userId === 'rambabu';
-
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>User Profile Not Found</Text>
-      </SafeAreaView>
-    );
-  }
-
-  const myPosts = DEMO_POSTS.filter(post => post.authorId === userId);
-
-  const handleEditProfile = () => {
-    Alert.alert("Edit Profile", "This feature will be connected to the MongoDB backend soon!");
-  };
+  if (loading) return <ActivityIndicator size="large" color="#0088cc" style={{ flex: 1 }} />;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topActionHeader}>
-        <Text style={styles.headerTitle}>
-          {isMe ? 'My Profile' : `${user.username}`}
-        </Text>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="search-outline" size={22} color="#555" />
-          </TouchableOpacity>
-          {isMe && (
-            <TouchableOpacity style={styles.iconButton} onPress={handleEditProfile}>
-              <Ionicons name="settings-outline" size={22} color="#555" />
-            </TouchableOpacity>
-          )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topNav}>
+        <Text style={styles.headerTitle}>My Profile</Text>
+        <View style={styles.iconGroup}>
+          <Ionicons name="search" size={24} color="#000" style={styles.icon} />
+          <Ionicons name="settings-outline" size={24} color="#000" />
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        <View style={styles.profileCard}>
-          <View style={styles.imagePlaceholder}>
-             <Image source={{ uri: user.profileImage }} style={styles.profileImage} />
-          </View>
-          <View style={styles.textInfo}>
-            <Text style={styles.username}>
-              {user.username} {user.role === 'admin' && '🛡️'}
-            </Text>
-            <View style={styles.statsRow}> 
-              <Text style={styles.userId}>{user.handle}</Text>
-              <Text style={styles.dotSeparator}>•</Text>
-              <Text style={styles.followerCount}>{user.followers} Followers</Text>
+      <FlatList
+        data={myPosts}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={() => (
+          <View style={styles.header}>
+            <Image source={{ uri: user?.profileUrl || 'https://via.placeholder.com/150' }} style={styles.avatar} />
+            <Text style={styles.name}>{user?.name || 'User Name'}</Text>
+            <Text style={styles.handle}>@{user?.userName || 'username'}</Text>
+            
+            <TouchableOpacity style={styles.statsContainer}>
+              <Text style={styles.statsText}>{user?.friends?.length || 0} Friends</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.bio}>{user?.profession || 'Health expert & AI enthusiast'}</Text>
+            
+            <View style={styles.buttonRow}>
+              {/* 3. THE FIX IS HERE -> navigation.navigate('EditProfile') */}
+              <TouchableOpacity 
+                style={styles.editBtn} 
+                onPress={() => navigation.navigate('EditProfile')}
+              >
+                <Text style={styles.editBtnText}>Edit Profile</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+                <Ionicons name="log-out-outline" size={22} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.tabContainer}>
+              <Text style={styles.tabActive}>Posts ({myPosts.length})</Text>
+              <Text style={styles.tabInactive}>Comments</Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.bioContainer}>
-          <Text style={styles.bioText}>{user.bio}</Text>
-        </View>
-
-        {isMe && (
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
         )}
-
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'Posts' && styles.activeTab]} 
-            onPress={() => setActiveTab('Posts')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Posts' && styles.activeTabText]}>
-              Posts ({myPosts.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'Comments' && styles.activeTab]} 
-            onPress={() => setActiveTab('Comments')}
-          >
-            <Text style={[styles.tabText, activeTab === 'Comments' && styles.activeTabText]}>
-              Comments
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 'Posts' ? (
-          <View>
-            {myPosts.map(post => (
-              <PostCard 
-                key={post.id}
-                authorId={post.authorId}
-                time={post.time} 
-                caption={post.caption}
-                image={post.image}
-              />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={{ color: '#888' }}>No comments posted yet.</Text>
-          </View>
+        renderItem={({ item }) => (
+          <PostCard username={item.user?.userName} caption={item.content} image={item.imageUrl} />
         )}
-      </ScrollView>
+        ListEmptyComponent={<Text style={styles.emptyText}>No posts yet.</Text>}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  topActionHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 20, 
-    paddingVertical: 15 
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerIcons: { flexDirection: 'row' },
-  iconButton: { marginLeft: 20 },
-  profileCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    paddingTop: 10, 
-    marginBottom: 10 
-  },
-  imagePlaceholder: { 
-    width: 70, 
-    height: 70, 
-    borderRadius: 15, 
-    overflow: 'hidden', 
-    backgroundColor: '#eee' 
-  },
-  profileImage: { width: 70, height: 70 },
-  textInfo: { marginLeft: 15 },
-  username: { fontSize: 22, fontWeight: '800' },
-  statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  userId: { fontSize: 14, color: '#888' },
-  dotSeparator: { marginHorizontal: 6, color: '#ccc' },
-  followerCount: { fontSize: 14, fontWeight: '600', color: '#0088cc' },
-  bioContainer: { paddingHorizontal: 20, marginBottom: 15 },
-  bioText: { color: '#444', lineHeight: 20 },
-  
-  editButton: {
-    marginHorizontal: 20,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  editButtonText: {
-    fontWeight: '700',
-    color: '#333',
-  },
-
-  tabContainer: { 
-    flexDirection: 'row', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#eee', 
-    paddingHorizontal: 20 
-  },
-  tab: { 
-    paddingVertical: 12, 
-    marginRight: 30, 
-    borderBottomWidth: 2, 
-    borderBottomColor: 'transparent' 
-  },
-  activeTab: { borderBottomColor: '#0088cc' },
-  tabText: { fontSize: 16, fontWeight: '600', color: '#888' },
-  activeTabText: { color: '#000' },
-  emptyState: { padding: 40, alignItems: 'center' },
-  errorText: { padding: 20, color: 'red', textAlign: 'center' }
+  topNav: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  iconGroup: { flexDirection: 'row' },
+  icon: { marginRight: 20 },
+  header: { alignItems: 'center', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
+  name: { fontSize: 24, fontWeight: '900', color: '#1a1a1a' },
+  handle: { fontSize: 16, color: '#666', marginBottom: 10 },
+  statsContainer: { marginBottom: 10 },
+  statsText: { fontSize: 16, fontWeight: 'bold', color: '#0088cc' },
+  bio: { fontSize: 16, color: '#444', textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 },
+  buttonRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  editBtn: { backgroundColor: '#f0f0f0', paddingVertical: 12, paddingHorizontal: 100, borderRadius: 8, marginRight: 10 },
+  editBtnText: { fontWeight: 'bold', fontSize: 16, color: '#000' },
+  logoutBtn: { backgroundColor: '#fff0f0', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#ff4444' },
+  tabContainer: { flexDirection: 'row', width: '100%', justifyContent: 'space-around', marginTop: 10 },
+  tabActive: { fontWeight: 'bold', fontSize: 16, borderBottomWidth: 2, borderBottomColor: '#0088cc', paddingBottom: 5 },
+  tabInactive: { fontWeight: 'bold', fontSize: 16, color: '#888' },
+  emptyText: { textAlign: 'center', marginTop: 20, color: '#888' }
 });

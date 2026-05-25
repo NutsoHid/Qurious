@@ -1,78 +1,51 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import PostCard from '../components/PostCard';
 import CustomHeader from '../components/CustomHeader';
-import CustomDrawer from '../components/CustomDrawer';
-import { DEMO_POSTS } from '../constants/demoData';
+import PostCard from '../components/PostCard';
+import api from '../services/api';
 
 export default function HomeScreen() {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filteredPosts = activeCategory === 'All' 
-    ? DEMO_POSTS 
-    : DEMO_POSTS.filter(post => post.category === activeCategory);
+  const fetchPosts = async () => {
+    try {
+      const response = await api.get('/post/allPost');
+      // Set the posts from backend
+      setPosts(response.data.posts);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CustomHeader onMenuPress={() => setIsDrawerOpen(true)} />
-
-    
-      <CustomDrawer 
-        visible={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-        onSelectCategory={(category) => {
-          setActiveCategory(category); 
-          setIsDrawerOpen(false);     
-        }}
-      />
-
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-       
-        {activeCategory !== 'All' && (
-          <Text style={styles.categoryTitle}>{activeCategory} Discussions</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <CustomHeader />
+      {loading ? (
+        <ActivityIndicator size="large" color="#0088cc" />
+      ) : (
+              <FlatList
+        data={posts}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <PostCard 
+            username={item.user?.userName}  // item.user is populated now
+            profileImage={item.user?.profileUrl}
+            caption={item.content}
+            image={item.imageUrl}
+          />
         )}
-
-        <View style={styles.feedContainer}>
-          {filteredPosts.map((post) => (
-            <PostCard
-              key={post.id}
-              authorId={post.authorId}
-              time={post.time}
-              caption={post.caption}
-              image={post.image}
-            />
-          ))}
-          
-         
-          {filteredPosts.length === 0 && (
-            <Text style={styles.emptyText}>No posts found in this category yet.</Text>
-          )}
-        </View>
-      </ScrollView>
+      />
+      )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  feedContainer: { flex: 1, paddingTop: 10 },
-  categoryTitle: { 
-    fontSize: 18, 
-    fontWeight: '800', 
-    color: '#0088cc', 
-    marginLeft: 16, 
-    marginTop: 15,
-    marginBottom: 5
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#888',
-    marginTop: 40,
-    fontSize: 16
-  }
-});
