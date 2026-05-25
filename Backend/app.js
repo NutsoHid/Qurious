@@ -17,7 +17,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/user", Userrouter);
-app.use("api/post", postRouter);
+app.use("/api/post", postRouter);
 app.use("/api/comment", commentRouter);
 app.use("/api/vote", voteRouter);
 
