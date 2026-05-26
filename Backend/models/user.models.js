@@ -10,50 +10,41 @@ const userSchema = new Schema(
       unique: true,
       trim: true,
     },
-
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
     },
-
     name: {
       type: String,
       required: true,
       trim: true,
     },
-
     password: {
       type: String,
       required: true,
     },
-
     profession: {
       type: String,
     },
-
     accountType: {
       type: String,
       enum: ["user", "admin"],
       default: "user",
     },
-
     verified: {
       type: Boolean,
       default: false,
     },
-
     profileUrl: {
       type: String,
       default: "",
     },
-
     refreshToken: {
       type: String,
       default: "",
     },
-
     experience: [
       {
         title: String,
@@ -62,14 +53,12 @@ const userSchema = new Schema(
         description: String,
       },
     ],
-
     friends: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-
     comments: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -79,18 +68,21 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-userSchema.pre("save", async function () {
+// Encrypt password using bcrypt before saving
+userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return;
-
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+// Match user entered password to hashed password
 userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
+
+// Generate Active Token for Login/Signup
 userSchema.methods.activeToken = function () {
   return jwt.sign(
     {
@@ -104,10 +96,11 @@ userSchema.methods.activeToken = function () {
     process.env.ACCESS_TOKEN_SECRET,
     {
       expiresIn: "15m",
-    },
+    }
   );
 };
 
+// Generate Refresh Token
 userSchema.methods.refreshTokenGenerator = function () {
   return jwt.sign(
     {
@@ -116,7 +109,7 @@ userSchema.methods.refreshTokenGenerator = function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: "7d",
-    },
+    }
   );
 };
 

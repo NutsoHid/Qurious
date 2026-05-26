@@ -1,36 +1,61 @@
-import React, { useContext } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AuthContext } from '../context/AuthContext'; // 🔥 Import context for smart routing
+import { AuthContext } from '../context/AuthContext';
+import api from '../services/api'; // Make sure api is imported!
 
 export default function PostCard({ post, disableProfileClick = false }) {
   const navigation = useNavigation();
   const { user: currentUser } = useContext(AuthContext);
+  
+  // --- LIKE SYSTEM STATE ---
+  // We check if the current user's ID is inside the post.likes array
+  const initialIsLiked = post.likes?.includes(currentUser?._id) || false;
+  const initialLikesCount = post.likes?.length || 0;
+
+  const [isLiked, setIsLiked] = useState(initialIsLiked);
+  const [likesCount, setLikesCount] = useState(initialLikesCount);
+  const [isLiking, setIsLiking] = useState(false);
 
   const authorName = post.anonymous ? 'Anonymous' : (post.user?.name || 'Unknown User');
   const authorHandle = post.anonymous ? '@hidden' : (post.user?.userName || 'unknown');
-  const profileImage = post.anonymous || !post.user?.profileUrl 
-    ? 'https://via.placeholder.com/150' 
+  const profileImage = post.anonymous || !post.user?.profileUrl
+    ? 'https://via.placeholder.com/150'
     : post.user.profileUrl;
 
-  // 🔥 Smart Routing Function
   const handleProfileClick = () => {
     if (disableProfileClick || post.anonymous || !post.user) return;
-
     if (post.user._id === currentUser?._id) {
-      // If it's my own post, go to my dashboard
-      navigation.navigate('YouTab'); 
+      navigation.navigate('YouTab');
     } else {
-      // If it's someone else, open their public profile
       navigation.navigate('OtherUserProfile', { userName: post.user.userName });
+    }
+  };
+
+  // --- LIKE BUTTON LOGIC ---
+  const handleLike = async () => {
+    // Instant UI update for the user (feels fast)
+    setIsLiked(!isLiked);
+    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
+    setIsLiking(true);
+
+    try {
+      // Call the backend to actually save it
+      await api.post(`/post/like/${post._id}`);
+    } catch (error) {
+      console.log("Error liking post:", error);
+      // If it fails, revert the UI back to normal
+      setIsLiked(isLiked);
+      setLikesCount(likesCount);
+    } finally {
+      setIsLiking(false);
     }
   };
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        {/* Wrap the author info in a TouchableOpacity */}
         <TouchableOpacity 
           style={styles.authorInfo} 
           onPress={handleProfileClick}
@@ -53,21 +78,30 @@ export default function PostCard({ post, disableProfileClick = false }) {
         <Text style={styles.content}>{post.content}</Text>
       </View>
 
-      {post.imageUrl && (
-        <Image 
-          source={{ uri: post.imageUrl }} 
-          style={styles.postImage} 
-          resizeMode="cover"
-        />
-      )}
+      {post.imageUrl ? (
+        <Image source={{ uri: post.imageUrl }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn}>
-          <Ionicons name="heart-outline" size={24} color="#666" />
-          <Text style={styles.actionText}>Like</Text>
-        </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionBtn}>
+        {/* INTERACTIVE LIKE BUTTON */}
+        <TouchableOpacity 
+           style={styles.actionBtn} 
+           onPress={handleLike}
+           disabled={isLiking}
+        >
+          <Ionicons 
+             name={isLiked ? "heart" : "heart-outline"} 
+             size={24} 
+             color={isLiked ? "#E0245E" : "#666"} // Turns Twitter Red when liked!
+          />
+          <Text style={[styles.actionText, isLiked && { color: "#E0245E" }]}>
+             {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* COMMENT BUTTON (Next Step!) */}
+        <TouchableOpacity style={styles.actionBtn} onPress={() => console.log("Open comments")}>
           <Ionicons name="chatbubble-outline" size={22} color="#666" />
           <Text style={styles.actionText}>{post.comments?.length || 0} Comments</Text>
         </TouchableOpacity>

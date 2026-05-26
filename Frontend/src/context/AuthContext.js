@@ -45,13 +45,14 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       console.log('Login Error:', error.response?.data);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Login failed. Check your credentials.' 
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Login failed. Check your credentials.'
       };
     }
   };
 
+  // Fixed the syntax error here (added the '=' sign)
   const signup = async (name, userName, email, profession, password) => {
     try {
       await api.post('/user/signup', {
@@ -62,14 +63,12 @@ export const AuthProvider = ({ children }) => {
         password
       });
 
-      // THE FIX: We removed the auto-login logic here!
-      // We just return success so the UI knows to send them to the login screen.
       return { success: true };
     } catch (error) {
       console.log('Signup Error:', error.response?.data);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Failed to create account.' 
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to create account.'
       };
     }
   };

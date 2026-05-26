@@ -6,7 +6,6 @@ import { AuthContext } from '../context/AuthContext';
 
 export default function SignupScreen({ navigation }) {
   const { signup } = useContext(AuthContext);
-
   const [name, setName] = useState('');
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,18 +19,14 @@ export default function SignupScreen({ navigation }) {
       Alert.alert('Missing Fields', 'Please fill in all required fields.');
       return;
     }
-
     setIsSubmitting(true);
     const result = await signup(name, userName, email, profession, password);
     setIsSubmitting(false);
-    
-    // THE FIX: If successful, show an alert and redirect to Login!
+
     if (result.success) {
-      Alert.alert(
-        'Account Created!', 
-        'Your account has been created successfully. Please log in.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
+      Alert.alert('Account Created!', 'Your account has been created successfully. Please log in.', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') }
+      ]);
     } else {
       Alert.alert('Signup Failed', result.message);
     }
@@ -53,35 +48,39 @@ export default function SignupScreen({ navigation }) {
 
           <View style={styles.formContainer}>
             <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={22} color="#6B7280" style={styles.icon} />
+              <Ionicons name="person-outline" size={22} color="#687280" style={styles.icon} />
               <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#9CA3AF" value={name} onChangeText={setName} />
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="at-outline" size={22} color="#6B7280" style={styles.icon} />
+              <Ionicons name="at-outline" size={22} color="#687280" style={styles.icon} />
               <TextInput style={styles.input} placeholder="Username" placeholderTextColor="#9CA3AF" autoCapitalize="none" value={userName} onChangeText={setUserName} />
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={22} color="#6B7280" style={styles.icon} />
+              <Ionicons name="mail-outline" size={22} color="#687280" style={styles.icon} />
               <TextInput style={styles.input} placeholder="Email Address" placeholderTextColor="#9CA3AF" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="briefcase-outline" size={22} color="#6B7280" style={styles.icon} />
+              <Ionicons name="briefcase-outline" size={22} color="#687280" style={styles.icon} />
               <TextInput style={styles.input} placeholder="Profession (e.g. Health Expert)" placeholderTextColor="#9CA3AF" value={profession} onChangeText={setProfession} />
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={22} color="#6B7280" style={styles.icon} />
+              <Ionicons name="lock-closed-outline" size={22} color="#687280" style={styles.icon} />
               <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#9CA3AF" secureTextEntry={!showPassword} value={password} onChangeText={setPassword} />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#6B7280" />
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#687280" />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.signupBtn} onPress={handleSignup} disabled={isSubmitting}>
-              {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.signupText}>Sign Up</Text>}
+              {isSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.signupText}>Sign Up</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -104,7 +103,7 @@ const styles = StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: 20 },
   headerContainer: { marginBottom: 40 },
   brandText: { fontSize: 32, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  subText: { fontSize: 16, color: '#6B7280', marginTop: 8 },
+  subText: { fontSize: 16, color: '#687280', marginTop: 8 },
   formContainer: { width: '100%' },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 16, marginBottom: 16, paddingHorizontal: 16, height: 60, borderWidth: 1, borderColor: '#E5E7EB' },
   icon: { marginRight: 12 },

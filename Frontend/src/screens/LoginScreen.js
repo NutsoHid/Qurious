@@ -1,12 +1,11 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
-  const { login } = useContext(AuthContext); 
-  
+  const { login } = useContext(AuthContext);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,11 +16,10 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Hold up!', 'Please fill in both fields.');
       return;
     }
-
     setIsSubmitting(true);
     const result = await login(identifier, password);
     setIsSubmitting(false);
-
+    
     if (!result.success) {
       Alert.alert('Login Failed', result.message);
     }
@@ -41,8 +39,8 @@ export default function LoginScreen({ navigation }) {
 
         <View style={styles.formContainer}>
           <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={22} color="#6B7280" style={styles.icon} />
-            <TextInput 
+            <Ionicons name="person-outline" size={22} color="#687280" style={styles.icon} />
+            <TextInput
               style={styles.input}
               placeholder="Username or Email"
               placeholderTextColor="#9CA3AF"
@@ -53,8 +51,8 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={22} color="#6B7280" style={styles.icon} />
-            <TextInput 
+            <Ionicons name="lock-closed-outline" size={22} color="#687280" style={styles.icon} />
+            <TextInput
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="#9CA3AF"
@@ -77,11 +75,12 @@ export default function LoginScreen({ navigation }) {
 
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Signup')}> 
+            <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
               <Text style={styles.signupText}>Sign Up</Text>
             </TouchableOpacity>
           </View>
         </View>
+        
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -93,7 +92,7 @@ const styles = StyleSheet.create({
   headerContainer: { alignItems: 'center', marginBottom: 50 },
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#0088cc', justifyContent: 'center', alignItems: 'center', marginBottom: 20, shadowColor: '#0088cc', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 8 },
   brandText: { fontSize: 28, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
-  subText: { fontSize: 16, color: '#6B7280', marginTop: 8 },
+  subText: { fontSize: 16, color: '#687280', marginTop: 8 },
   formContainer: { width: '100%' },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 16, marginBottom: 16, paddingHorizontal: 16, height: 60, borderWidth: 1, borderColor: '#E5E7EB' },
   icon: { marginRight: 12 },

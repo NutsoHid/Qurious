@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, FlatList, ActivityIndicator, RefreshControl, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomHeader from '../components/CustomHeader';
-import CustomDrawer from '../components/CustomDrawer'; // 🔥 IMPORT YOUR CUSTOM DRAWER
+import CustomDrawer from '../components/CustomDrawer';
 import PostCard from '../components/PostCard';
 import api from '../services/api';
 
@@ -10,13 +10,13 @@ export default function HomeScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // 🔥 DRAWER STATE CONTROLLER
-  const [isDrawerVisible, setIsDrawerVisible] = useState(false); 
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('All');
 
   const fetchPosts = async () => {
     try {
-      const response = await api.get('/post/allPost');
+      // Passes category to the backend query to filter posts!
+      const response = await api.get(`/post/allPost?category=${activeCategory}`);
       setPosts(response.data.posts || []);
     } catch (error) {
       console.error("Error fetching posts:", error);
@@ -27,8 +27,9 @@ export default function HomeScreen({ navigation }) {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchPosts();
-  }, []);
+  }, [activeCategory]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -37,19 +38,17 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Set the drawer state to true when the menu button is pressed */}
       <CustomHeader onMenuPress={() => setIsDrawerVisible(true)} />
       
-      {/* 🔥 THE CUSTOM DRAWER COMPONENT */}
       <CustomDrawer 
         visible={isDrawerVisible} 
         onClose={() => setIsDrawerVisible(false)} 
         onSelectCategory={(category) => {
-          // You can use this later to filter posts by category!
+          setActiveCategory(category);
           setIsDrawerVisible(false);
         }}
       />
-      
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#0088cc" />

@@ -2,37 +2,20 @@ import { User } from "../models/user.models.js";
 
 export const userSignUp = async (req, res) => {
   try {
-    const {
-      userName,
-      password,
-      email,
-      name,
-      profession,
-      accountType,
-      verified,
-      profileUrl,
-    } = req.body;
+    const { userName, password, email, name, profession, accountType, verified, profileUrl } = req.body;
 
     if (!userName || !password || !email || !name) {
-      return res.status(400).json({
-        message: "Incomplete credentials",
-      });
+      return res.status(400).json({ message: "Incomplete credentials" });
     }
 
     const existingUser = await User.findOne({ email });
-
     if (existingUser) {
-      return res.status(400).json({
-        message: "User already exists proceed to login page",
-      });
+      return res.status(400).json({ message: "User email already exists. Proceed to login page." });
     }
 
     const existingUserName = await User.findOne({ userName });
-
     if (existingUserName) {
-      return res.status(400).json({
-        message: "Username already exists",
-      });
+      return res.status(400).json({ message: "Username already exists" });
     }
 
     const newUser = await User.create({
@@ -48,13 +31,11 @@ export const userSignUp = async (req, res) => {
 
     const activeToken = await newUser.activeToken();
     const refreshToken = await newUser.refreshTokenGenerator();
-
     newUser.refreshToken = refreshToken;
+    
     await newUser.save({ validateBeforeSave: false });
 
-    const createdUser = await User.findById(newUser._id).select(
-      "-password -refreshToken",
-    );
+    const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
 
     return res.status(201).json({
       message: "User created successfully",
@@ -77,8 +58,8 @@ export const userSignIn = async (req, res) => {
       return res.status(400).json({ message: "Incomplete credentials" });
     }
 
-    let userExists = userName
-      ? await User.findOne({ userName })
+    let userExists = userName 
+      ? await User.findOne({ userName }) 
       : await User.findOne({ email });
 
     if (!userExists) {
@@ -86,21 +67,19 @@ export const userSignIn = async (req, res) => {
     }
 
     const passwordCheck = await userExists.isPasswordCorrect(password);
-
     if (!passwordCheck) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const activeToken = await userExists.activeToken();
     const refreshToken = await userExists.refreshTokenGenerator();
-
     userExists.refreshToken = refreshToken;
-
+    
     await userExists.save({ validateBeforeSave: false });
 
     const userData = userExists.toObject();
     delete userData.password;
-    delete userData.refreshToken;
+    delete userData.refreshToken; 
 
     return res.status(200).json({
       message: "User logged in",
@@ -122,7 +101,6 @@ export const getCurrentUser = async (req, res) => {
     }
 
     const userExists = await User.findById(req.userId);
-
     if (!userExists) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -146,13 +124,12 @@ export const getCurrentUser = async (req, res) => {
 export const getUserProfile = async (req, res) => {
   try {
     const { userName } = req.params;
-
+    
     if (!userName) {
       return res.status(400).json({ message: "Username is required" });
     }
 
     const userExists = await User.findOne({ userName });
-
     if (!userExists) {
       return res.status(404).json({ message: "Profile not found" });
     }

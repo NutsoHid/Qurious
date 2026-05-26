@@ -1,4 +1,4 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema(
   {
@@ -10,23 +10,27 @@ const postSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
+      trim: true,
     },
     content: {
       type: String,
       required: true,
     },
-    imageUrl: {
-      type: String,
-    },
     category: {
       type: String,
-      enum: ["Health", "Education", "Social"],
+      enum: ["Health", "Social", "Education", "Trending", "All"],
       default: "Social",
     },
-    anonymous: {
-      type: Boolean,
-      default: false,
+    imageUrl: {
+      type: String,
+      default: "", // Will hold the image link if user uploads one
     },
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     comments: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -34,9 +38,7 @@ const postSchema = new mongoose.Schema(
       },
     ],
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true }
 );
 
 export const Post = mongoose.model("Post", postSchema);
