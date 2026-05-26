@@ -20,7 +20,7 @@ export const toggleVote = async (req, res) => {
     //case b
     if (existingLike) {
       if (existingLike.isLike === isLike) {
-        await Vote.findByIdAndDelete(existingVote._id);
+        await Vote.findByIdAndDelete(existingLike._id);
         return res
           .status(200)
           .json({ message: "Vote removed successffully", voteState: null });
@@ -30,10 +30,10 @@ export const toggleVote = async (req, res) => {
       await existingLike.save();
       return res.status(200).json({
         message: "Vote updated successfully",
-        vote: existingVote,
+        vote: existingLike,
       });
     }
-    const newVOte = await Vote.create({
+    const newVote = await Vote.create({
       user: userId,
       type,
       typeId,

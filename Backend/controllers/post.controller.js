@@ -4,20 +4,25 @@ import { Post } from "../models/post.models.js";
 export const getOnePost = async (req, res) => {
   try {
     const { postId } = req.params;
+
     const postById = await Post.findById(postId).populate(
       "user",
       "userName name profileUrl",
     );
+
     if (!postById) {
       return res.status(404).json({ message: "Post not found" });
     }
-    return res
-      .status(200)
-      .json({ message: "Post found successfully", singlePost: post });
+
+    return res.status(200).json({
+      message: "Post found successfully",
+      singlePost: postById,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Something went wrong from getOnePost" });
+    return res.status(500).json({
+      message: "Something went wrong from getOnePost",
+      error: error.message,
+    });
   }
 };
 export const getAllPost = async (req, res) => {
@@ -64,8 +69,8 @@ export const uploadPost = async (req, res) => {
   }
 };
 export const deletePost = async (req, res) => {
-  const { id } = req.params;
-  const deletedPost = await Post.findByIdAndDelete(id);
+  const { postId } = req.params;
+  const deletedPost = await Post.findByIdAndDelete(postId);
   if (!deletedPost) {
     return res.status(404).json({ message: "Post not found" });
   }
@@ -73,10 +78,10 @@ export const deletePost = async (req, res) => {
 };
 export const editPost = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { postId } = req.params;
     const { title, content } = req.body;
     const updatedPost = await Post.findByIdAndUpdate(
-      id,
+      postId,
       { title, content },
       { new: true },
     );
@@ -89,6 +94,6 @@ export const editPost = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json({ message: "Something went wrontg from editPost" });
+      .json({ message: "Something went wrong from editPost" });
   }
 };

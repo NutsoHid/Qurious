@@ -12,11 +12,12 @@ import { upload } from "../Middlewares/multer.js";
 const postRouter = express.Router();
 
 postRouter.post("/upload", verifyJWT, upload.single("postImage"), uploadPost);
-postRouter.get("/singlePost/:id", getOnePost);
+
+postRouter.get("/singlePost/:postId", getOnePost);
 postRouter.get("/allPost", getAllPost);
-postRouter.delete("/deletPost/:id", verifyJWT, deletePost);
+postRouter.delete("/deletPost/:postId", verifyJWT, deletePost);
 postRouter.put(
-  "/editPost/:id",
+  "/editPost/:postId",
   verifyJWT,
   upload.single("postImage"),
   editPost,

@@ -1,4 +1,6 @@
 import { Report } from "../models/report.models.js";
+import { Post } from "../models/post.models.js";
+import mongoose from "mongoose";
 export const createReport = async (req, res) => {
   try {
     const { userId } = req;
@@ -9,7 +11,6 @@ export const createReport = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Anti-Spam Check: Has this user already reported this exact item?
     const existingReport = await Report.findOne({ user: userId, typeId });
     if (existingReport) {
       return res
@@ -39,6 +40,10 @@ export const getReport = async (req, res) => {
   try {
     const { userId } = req;
     const { reportId } = req.params;
+
+    if (!mongoose.models.Post) {
+      await import("../models/post.models.js");
+    }
 
     const report = await Report.findOne({
       _id: reportId,

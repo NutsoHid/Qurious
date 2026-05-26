@@ -3,7 +3,7 @@ import { Comment } from "../models/comment.models.js";
 
 export const createComment = async (req, res) => {
   try {
-    const { userId } = req; // 1. Extract the logged-in user's ID
+    const { userId } = req;
     const { ParentcommentId, postId } = req.params;
     const { content } = req.body;
 
@@ -60,9 +60,8 @@ export const getComment = async (req, res) => {
 
 export const getAllComment = async (req, res) => {
   try {
-    // FIXED TYPO: Changed req.paraaudaims to req.params
-    const { postId } = req.params; 
-    
+    const { postId } = req.params;
+
     if (!postId) {
       return res.status(400).json({ message: "Post ID is required" });
     }
@@ -84,18 +83,19 @@ export const getAllComment = async (req, res) => {
   }
 };
 
-// 🔥 NEW: Fetches the logged-in user's comments for the Profile Dashboard
 export const getMyComments = async (req, res) => {
   try {
     const { userId } = req;
-    
+
     const comments = await Comment.find({ user: userId })
       .populate("post", "title")
       .sort({ createdAt: -1 });
-      
+
     return res.status(200).json({ comments });
   } catch (error) {
-    return res.status(500).json({ message: "Error fetching user comments", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Error fetching user comments", error: error.message });
   }
 };
 
@@ -133,14 +133,12 @@ export const deleteComment = async (req, res) => {
     const { userId } = req;
     const { commentId } = req.params;
 
-    // We use findOneAndUpdate so the document stays in the database
-    // The ownership check ({ user: userId }) still ensures only the creator can delete it!
     const softDeletedComment = await Comment.findOneAndUpdate(
       { _id: commentId, user: userId },
       {
-        content: "[Deleted]", // Overwriting the original text
+        content: "[Deleted]",
       },
-      { new: true }, // Returns the updated comment object
+      { new: true },
     );
 
     if (!softDeletedComment) {

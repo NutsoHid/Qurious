@@ -12,7 +12,7 @@ const voteSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ["post", "comment"],
+      enum: ["Post", "Comment"],
       required: true,
     },
     typeId: {
