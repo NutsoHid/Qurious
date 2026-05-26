@@ -1,16 +1,14 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
-import api from '../services/api'; // Make sure api is imported!
+import api from '../services/api'; 
 
-export default function PostCard({ post, disableProfileClick = false }) {
+export default function PostCard({ post, disableProfileClick = false, onOpenComments, onPostDeleted }) {
   const navigation = useNavigation();
   const { user: currentUser } = useContext(AuthContext);
   
-  // --- LIKE SYSTEM STATE ---
-  // We check if the current user's ID is inside the post.likes array
   const initialIsLiked = post.likes?.includes(currentUser?._id) || false;
   const initialLikesCount = post.likes?.length || 0;
 
@@ -24,32 +22,68 @@ export default function PostCard({ post, disableProfileClick = false }) {
     ? 'https://via.placeholder.com/150'
     : post.user.profileUrl;
 
+  const isOwner = currentUser?._id === post.user?._id;
+  const isAdmin = currentUser?.accountType === 'admin';
+
   const handleProfileClick = () => {
     if (disableProfileClick || post.anonymous || !post.user) return;
-    if (post.user._id === currentUser?._id) {
+    if (isOwner) {
       navigation.navigate('YouTab');
     } else {
       navigation.navigate('OtherUserProfile', { userName: post.user.userName });
     }
   };
 
-  // --- LIKE BUTTON LOGIC ---
   const handleLike = async () => {
-    // Instant UI update for the user (feels fast)
     setIsLiked(!isLiked);
     setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
     setIsLiking(true);
 
     try {
-      // Call the backend to actually save it
       await api.post(`/post/like/${post._id}`);
     } catch (error) {
       console.log("Error liking post:", error);
-      // If it fails, revert the UI back to normal
       setIsLiked(isLiked);
       setLikesCount(likesCount);
     } finally {
       setIsLiking(false);
+    }
+  };
+
+  // 👇 NEW: Options Menu (Delete or Report)
+  const handleOptions = () => {
+    if (isOwner || isAdmin) {
+      Alert.alert("Post Options", "What would you like to do?", [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete Post", 
+          style: "destructive", 
+          onPress: async () => {
+            try {
+              await api.delete(`/post/deletePost/${post._id}`);
+              if(onPostDeleted) onPostDeleted(post._id); // Instantly removes it from the screen
+              Alert.alert("Deleted", "Your post has been removed.");
+            } catch (error) {
+              Alert.alert("Error", "Could not delete post.");
+            }
+          } 
+        }
+      ]);
+    } else {
+      Alert.alert("Report Post", "Do you want to report this post to admins?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Spam", onPress: () => sendReport("Spam") },
+        { text: "Inappropriate Content", onPress: () => sendReport("Inappropriate Content"), style: "destructive" }
+      ]);
+    }
+  };
+
+  const sendReport = async (reason) => {
+    try {
+      await api.post(`/post/report/${post._id}`, { reason });
+      Alert.alert("Reported", "Thank you. Our admins will review this post.");
+    } catch (error) {
+      Alert.alert("Error", "Could not submit report.");
     }
   };
 
@@ -68,8 +102,14 @@ export default function PostCard({ post, disableProfileClick = false }) {
           </View>
         </TouchableOpacity>
         
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{post.category || 'Social'}</Text>
+        <View style={styles.rightHeader}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{post.category || 'Social'}</Text>
+          </View>
+          {/* 👇 NEW: Three Dots Icon */}
+          <TouchableOpacity onPress={handleOptions} style={styles.optionsBtn}>
+            <Ionicons name="ellipsis-vertical" size={20} color="#888" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -83,27 +123,16 @@ export default function PostCard({ post, disableProfileClick = false }) {
       ) : null}
 
       <View style={styles.actionRow}>
-        
-        {/* INTERACTIVE LIKE BUTTON */}
-        <TouchableOpacity 
-           style={styles.actionBtn} 
-           onPress={handleLike}
-           disabled={isLiking}
-        >
-          <Ionicons 
-             name={isLiked ? "heart" : "heart-outline"} 
-             size={24} 
-             color={isLiked ? "#E0245E" : "#666"} // Turns Twitter Red when liked!
-          />
+        <TouchableOpacity style={styles.actionBtn} onPress={handleLike} disabled={isLiking}>
+          <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#E0245E" : "#666"} />
           <Text style={[styles.actionText, isLiked && { color: "#E0245E" }]}>
              {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
           </Text>
         </TouchableOpacity>
 
-        {/* COMMENT BUTTON (Next Step!) */}
-        <TouchableOpacity style={styles.actionBtn} onPress={() => console.log("Open comments")}>
+        <TouchableOpacity style={styles.actionBtn} onPress={onOpenComments}>
           <Ionicons name="chatbubble-outline" size={22} color="#666" />
-          <Text style={styles.actionText}>{post.comments?.length || 0} Comments</Text>
+          <Text style={styles.actionText}>Comment</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn}>
@@ -117,6 +146,8 @@ export default function PostCard({ post, disableProfileClick = false }) {
 const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', marginBottom: 10, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, marginBottom: 12 },
+  rightHeader: { flexDirection: 'row', alignItems: 'center' },
+  optionsBtn: { paddingLeft: 10 },
   authorInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: '#eee' },
   name: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },

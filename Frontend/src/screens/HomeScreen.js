@@ -4,18 +4,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomHeader from '../components/CustomHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import PostCard from '../components/PostCard';
+import CommentModal from '../components/CommentModal';
 import api from '../services/api';
 
 export default function HomeScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  
+  const [activePostId, setActivePostId] = useState(null);
+  const [isCommentModalVisible, setCommentModalVisible] = useState(false);
 
   const fetchPosts = async () => {
     try {
-      // Passes category to the backend query to filter posts!
       const response = await api.get(`/post/allPost?category=${activeCategory}`);
       setPosts(response.data.posts || []);
     } catch (error) {
@@ -34,6 +38,19 @@ export default function HomeScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     fetchPosts();
+  };
+
+  // 👇 This updates the number instantly on your screen
+  const handleCommentAdded = (postId) => {
+    setPosts((currentPosts) => 
+      currentPosts.map((post) => {
+        if (post._id === postId) {
+          const currentComments = post.comments || [];
+          return { ...post, comments: [...currentComments, 'new_comment'] };
+        }
+        return post;
+      })
+    );
   };
 
   return (
@@ -57,7 +74,19 @@ export default function HomeScreen({ navigation }) {
         <FlatList
           data={posts}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <PostCard post={item} />}
+          renderItem={({ item }) => (
+            <PostCard 
+              post={item} 
+              onOpenComments={() => {
+                setActivePostId(item._id);
+                setCommentModalVisible(true);
+              }}
+              // 👇 NEW: Instantly hide the post from the feed when deleted
+              onPostDeleted={(deletedId) => {
+                setPosts(prev => prev.filter(p => p._id !== deletedId));
+              }}
+            />
+          )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0088cc" />
           }
@@ -69,6 +98,15 @@ export default function HomeScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* 👇 Added onCommentAdded trigger */}
+      <CommentModal 
+        visible={isCommentModalVisible} 
+        onClose={() => setCommentModalVisible(false)} 
+        postId={activePostId} 
+        onCommentAdded={() => handleCommentAdded(activePostId)} 
+      />
+
     </SafeAreaView>
   );
 }

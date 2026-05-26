@@ -9,7 +9,7 @@ import "dotenv/config";
 import connect from "./config/db.config.js";
 import Userrouter from "./routes/user.routes.js";
 import postRouter from "./routes/post.route.js";
-import commentRouter from "./Routes/comment.route.js";
+import commentRouter from "./routes/comment.route.js";
 import voteRouter from "./Routes/vote.route.js";
 import reportRouter from "./Routes/report.route.js";
 
