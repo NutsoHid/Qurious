@@ -17,9 +17,13 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
     category: {
-      type: String,
-      enum: ["Health", "Social", "Education", "Trending", "All"],
-      default: "Social",
+    type: String,
+    enum: ["Health", "Social", "Education", "Trending", "All"],
+    default: "Social",
+    },
+    anonymous: {
+        type: Boolean,
+        default: false,
     },
     imageUrl: {
       type: String,
