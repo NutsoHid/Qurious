@@ -12,7 +12,7 @@ export const verifyJWT = async (req, res, next) => {
     const verifiedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
     const user = await User.findById(verifiedToken._id).select(
-      "-password -refreshToken",
+      "-password -refreshToken"
     );
 
     if (!user) {

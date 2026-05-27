@@ -26,8 +26,10 @@ export default function EditProfileScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
+    
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImage(result.assets.uri);
+      // FIX: Ensure you are grabbing the first item in the assets array
+      setImage(result.assets[0].uri);
     }
   };
 
@@ -39,47 +41,42 @@ export default function EditProfileScreen() {
       formData.append('userName', userName);
       formData.append('profession', profession);
 
+      // Only append the image if it's a new local image (not the existing Cloudinary URL)
       if (image && image !== user?.profileUrl) {
         let filename = image.split('/').pop();
         let match = /\.(\w+)$/.exec(filename);
         let type = match ? `image/${match[1]}` : `image/jpeg`;
+        
+        // Standardize jpg to jpeg for Multer compatibility
+        if (type === 'image/jpg') type = 'image/jpeg';
+
         formData.append('profileImage', { 
-          uri: image, 
+          // FIX: Strip 'file://' for iOS uploads to prevent FormData failures
+          uri: Platform.OS === 'ios' ? image.replace('file://', '') : image, 
           name: filename || 'avatar.jpg', 
           type: type 
         });
       }
 
-      const token = await AsyncStorage.getItem('userToken');
-      const baseURL = api.defaults.baseURL;
-
-      // Note: Make sure your friend has an active /user/update-profile route!
-      const response = await fetch(`${baseURL}/user/update-profile`, {
-        method: 'POST',
-        body: formData,
+      // FIX: Use your API instance and the correct backend endpoint
+      const response = await api.post('/user/profile', formData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
         },
       });
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.message || "Failed to update profile");
-      }
-
-      // Globally update the app UI
-      if (responseData.user) {
-        setUser(responseData.user);
-        await AsyncStorage.setItem('userData', JSON.stringify(responseData.user));
+      // Globally update the app UI with the new data from MongoDB/Cloudinary
+      if (response.data.user) {
+        setUser(response.data.user);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
       }
 
       Alert.alert("Success", "Profile updated perfectly!");
       navigation.goBack();
     } catch (error) {
-      console.error("Update Error:", error);
-      Alert.alert("Error", error.message || "Could not save changes");
+      console.error("Update Error:", error.response?.data || error.message);
+      Alert.alert("Error", error.response?.data?.message || "Could not save changes");
     } finally {
       setIsSubmitting(false);
     }

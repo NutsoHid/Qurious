@@ -9,12 +9,15 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
+  // Make sure your AuthContext is saving the token EXACTLY as "userToken"
   const token = await AsyncStorage.getItem("userToken");
+  
   if (token) {
-   
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 export default api;

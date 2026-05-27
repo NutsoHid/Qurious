@@ -1,6 +1,7 @@
 import { User } from "../models/user.models.js";
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
-
+import { Post } from "../models/post.models.js"; 
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import bcrypt from "bcryptjs"; 
 export const userSignUp = async (req, res) => {
   try {
     const { userName, password, email, name, profession, accountType, verified, profileUrl } = req.body;
@@ -182,49 +183,85 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+
+
 export const uploadProfile = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.userId; 
+    
+    // ✅ FIX: Added userName to the destructuring here so it's defined!
+    const { name, userName, profession, oldPassword, newPassword } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    const localFilePath = req.file?.path;
-    if (!localFilePath) {
-      return res.status(400).json({ message: "Profile image file is missing" });
-    }
-
-    const cloudinaryResponse = await uploadOnCloudinary(localFilePath);
-    
-    if (!cloudinaryResponse || !cloudinaryResponse.secure_url) {
-      return res.status(500).json({ message: "Failed to upload image to Cloudinary" });
-    }
-
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { profileUrl: cloudinaryResponse.secure_url },
-      { new: true }
-    ).select("-password -refreshToken");
-
-    if (!updatedUser) {
+    // 1. Find User (We need the password field to verify the old password)
+    const user = await User.findById(userId);
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // 2. Update Text Fields safely
+    if (name) user.name = name;
+    if (userName) user.userName = userName; // ✅ This will now work perfectly
+    if (profession) user.profession = profession;
+
+    // 3. Securely Update Password
+    if (oldPassword && newPassword) {
+      const isMatch = await bcrypt.compare(oldPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Incorrect old password." });
+      }
+      user.password = newPassword; // Mongoose 'pre-save' hook hashes this automatically
+    }
+
+    // 4. Handle Cloudinary Profile Image Upload
+    const localFilePath = req.file?.path;
+    if (localFilePath) {
+      const cloudinaryResponse = await uploadOnCloudinary(localFilePath);
+      if (cloudinaryResponse && cloudinaryResponse.secure_url) {
+        user.profileUrl = cloudinaryResponse.secure_url;
+      }
+    }
+
+    // Save everything at once
+    await user.save();
+
+    // 5. Clean up data before sending to frontend
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+    delete updatedUser.refreshToken;
+
     return res.status(200).json({
-      message: "Profile image updated successfully",
-      profileUrl: cloudinaryResponse.secure_url,
+      message: "Profile updated successfully",
       user: updatedUser,
+      profileUrl: updatedUser.profileUrl,
     });
 
   } catch (error) {
     return res.status(500).json({
-      message: "Something went wrong while uploading the profile image",
+      message: "Something went wrong while updating the profile",
       error: error.message,
     });
   }
 };
 
+// 👇 FIX FOR DASHBOARD POSTS (Zero likes/comments issue)
+export const getMyPosts = async (req, res) => {
+  try {
+    const userId = req.userId;
+    // .populate("comments") is the magic key that fixes your 0 comments bug!
+    const posts = await Post.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .populate("user", "userName name profileUrl")
+      .populate("comments"); 
+
+    return res.status(200).json({ posts });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching user posts", error: error.message });
+  }
+};
 
 export default {
   userSignUp,
@@ -232,4 +269,6 @@ export default {
   getCurrentUser,
   getUserProfile,
   getAllUsers,
+  uploadProfile,
+  getMyPosts,
 };
