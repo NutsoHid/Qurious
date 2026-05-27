@@ -20,11 +20,10 @@ export const getAllPost = async (req, res) => {
       query.category = category;
     }
 
-    // MAKE SURE THIS LINE HAS .populate("comments")
     const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .populate("user", "userName name profileUrl")
-      .populate("comments"); // <--- THIS IS THE MISSING KEY
+      .populate("comments"); 
 
     return res.status(200).json({ message: "Post found successfully", posts: posts });
   } catch (error) {
@@ -99,7 +98,6 @@ export const editPost = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "Something went wrong from editPost", error: error.message });
   }
-  
 };
 
 export const toggleLike = async (req, res) => {
@@ -112,14 +110,11 @@ export const toggleLike = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Check if the user already liked the post
     const isLiked = post.likes.includes(userId);
 
     if (isLiked) {
-      // Unlike: Remove user ID from the array
       post.likes.pull(userId);
     } else {
-      // Like: Add user ID to the array
       post.likes.push(userId);
     }
 
@@ -149,8 +144,6 @@ export const reportPost = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Here admins could log the report to a new database collection.
-    // For now, we just acknowledge the report so the frontend works perfectly.
     console.log(`🚨 REPORT FLAG: Post ${postId} reported for: ${reason}`);
 
     return res.status(200).json({ message: "Post reported successfully. Admins will review it." });

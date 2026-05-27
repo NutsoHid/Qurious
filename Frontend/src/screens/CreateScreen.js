@@ -56,7 +56,7 @@ export default function CreateScreen({ navigation }) {
         let match = /\.(\w+)$/.exec(filename);
         let type = match ? `image/${match[1]}` : `image`;
 
-        // 'postImage' matches your friend's backend: upload.single("postImage")
+        // 'postImage' matches your backend configuration
         formData.append('postImage', { uri: image, name: filename, type });
       }
 
@@ -65,6 +65,13 @@ export default function CreateScreen({ navigation }) {
           'Content-Type': 'multipart/form-data',
         },
       });
+
+      // ✅ FIX: Clear all input states immediately on success before navigating away
+      setTitle('');
+      setContent('');
+      setImage(null);
+      setIsAnonymous(false);
+      setCategory('Social');
 
       Alert.alert('Success!', 'Your post is live.');
       navigation.goBack(); // Return to Feed
@@ -78,7 +85,7 @@ export default function CreateScreen({ navigation }) {
 
   // Determine what avatar/name to show based on Anonymous toggle
   const displayAvatar = isAnonymous 
-    ? 'https://cdn-icons-png.flaticon.com/512/149/149071.png' // Default hidden avatar
+    ? 'https://cdn-icons-png.flaticon.com/512/149/149071.png' 
     : (user?.profileUrl || 'https://via.placeholder.com/150');
   
   const displayName = isAnonymous ? 'Anonymous' : (user?.name || 'User');
@@ -205,7 +212,7 @@ const styles = StyleSheet.create({
   anonymousToggle: { alignItems: 'center' },
   anonymousText: { fontSize: 11, fontWeight: '600', color: '#6B7280', marginBottom: 4 },
 
-  categoryContainer: { marginBottom: 20, marginRight: -20 }, // Negative margin allows scroll to bleed to edge
+  categoryContainer: { marginBottom: 20, marginRight: -20 },
   catBadge: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 10 },
   catBadgeActive: { backgroundColor: '#0088cc' },
   catText: { color: '#6B7280', fontWeight: '600', fontSize: 14 },
