@@ -1,4 +1,5 @@
 import { User } from "../models/user.models.js";
+import {uploadOnCloudinary} from "../utils/cloudinary.js"
 
 export const userSignUp = async (req, res) => {
   try {
@@ -181,6 +182,49 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+export const uploadProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const localFilePath = req.file?.path;
+    if (!localFilePath) {
+      return res.status(400).json({ message: "Profile image file is missing" });
+    }
+
+    const cloudinaryResponse = await uploadOnCloudinary(localFilePath);
+    
+    if (!cloudinaryResponse || !cloudinaryResponse.secure_url) {
+      return res.status(500).json({ message: "Failed to upload image to Cloudinary" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { profileUrl: cloudinaryResponse.secure_url },
+      { new: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "Profile image updated successfully",
+      profileUrl: cloudinaryResponse.secure_url,
+      user: updatedUser,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong while uploading the profile image",
+      error: error.message,
+    });
+  }
+};
+
 
 export default {
   userSignUp,
