@@ -20,7 +20,6 @@ export default function CreateScreen({ navigation }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pick an image from phone gallery
-  // Pick an image from phone gallery
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,

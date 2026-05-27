@@ -3,7 +3,6 @@ import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import PostCard from '../components/PostCard';
-import { DEMO_POSTS } from '../constants/demoData';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');

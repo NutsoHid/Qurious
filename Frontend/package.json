@@ -28,6 +28,7 @@
   },
   "private": true,
   "devDependencies": {
-    "babel-preset-expo": "^54.0.10"
+    "babel-preset-expo": "^54.0.10",
+    "expo-module-scripts": "^56.0.2"
   }
 }
