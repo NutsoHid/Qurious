@@ -52,11 +52,10 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-// 2. 🔥 THE MISSING PIECE: Controller to fetch chat logs when a user opens a chat window
 export const getMessages = async (req, res) => {
   try {
     const { targetUserId } = req.params;
-    const currentUserId = req.user._id; // Derived from your verifyJWT middleware
+    const currentUserId = req.user._id;
 
     // Find the 1v1 room holding these two specific users
     const conversation = await Conversation.findOne({
