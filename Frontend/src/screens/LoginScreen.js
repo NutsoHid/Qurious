@@ -19,8 +19,7 @@ export default function LoginScreen({ navigation }) {
     setIsSubmitting(true);
     const result = await login(identifier, password);
     setIsSubmitting(false);
-    
-    if (!result.success) {
+    if (!result.success) { 
       Alert.alert('Login Failed', result.message);
     }
   };

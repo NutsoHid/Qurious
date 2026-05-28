@@ -11,9 +11,12 @@ import { verifyJWT } from "../Middlewares/auth.middleware.js";
 
 const commentRouter = express.Router();
 
-// FIXED: Define the route twice instead of using the '?' syntax to avoid path-to-regexp crashes.
 commentRouter.post("/postComment/:postId", verifyJWT, createComment);
-commentRouter.post("/postComment/:postId/:ParentcommentId", verifyJWT, createComment);
+commentRouter.post(
+  "/postComment/:postId/:ParentcommentId",
+  verifyJWT,
+  createComment,
+);
 
 commentRouter.get("/getComment/:commentId", getComment);
 commentRouter.get("/getAllComment/:postId", getAllComment);

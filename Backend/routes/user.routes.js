@@ -5,7 +5,8 @@ import {
   getCurrentUser,
   getUserProfile,
   getAllUsers,
-  uploadProfile
+  uploadProfile,
+  requestVerification,
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../Middlewares/auth.middleware.js";
 import { upload } from "../Middlewares/multer.js";
@@ -18,7 +19,18 @@ Userrouter.post("/signin", userSignIn);
 Userrouter.get("/profile/:userName", getUserProfile);
 Userrouter.get("/me", verifyJWT, getCurrentUser);
 Userrouter.get("/all", verifyJWT, getAllUsers);
-Userrouter.post("/profile",verifyJWT, upload.single("profileImage"),uploadProfile);
+Userrouter.post(
+  "/profile",
+  verifyJWT,
+  upload.single("profileImage"),
+  uploadProfile,
+);
 Userrouter.get("/myPosts", verifyJWT, getMyPosts);
+Userrouter.post(
+  "/request-verification",
+  verifyJWT,
+  upload.single("document"),
+  requestVerification,
+);
 
 export default Userrouter;

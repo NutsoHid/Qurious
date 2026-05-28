@@ -17,13 +17,13 @@ const postSchema = new mongoose.Schema(
       required: true,
     },
     category: {
-    type: String,
-    enum: ["Health", "Social", "Education", "Trending", "All"],
-    default: "Social",
+      type: String,
+      enum: ["Health", "Social", "Education", "Trending", "All"],
+      default: "Social",
     },
     anonymous: {
-        type: Boolean,
-        default: false,
+      type: Boolean,
+      default: false,
     },
     imageUrl: {
       type: String,
@@ -42,7 +42,7 @@ const postSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export const Post = mongoose.model("Post", postSchema);

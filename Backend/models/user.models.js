@@ -53,7 +53,13 @@ const userSchema = new Schema(
         description: String,
       },
     ],
-    friends: [
+    followers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    following: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -65,24 +71,25 @@ const userSchema = new Schema(
         ref: "Comment",
       },
     ],
+    verificationDoc: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Encrypt password using bcrypt before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
 
-// Match user entered password to hashed password
 userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
-// Generate Active Token for Login/Signup
 userSchema.methods.activeToken = function () {
   return jwt.sign(
     {
@@ -96,11 +103,10 @@ userSchema.methods.activeToken = function () {
     process.env.ACCESS_TOKEN_SECRET,
     {
       expiresIn: "15m",
-    }
+    },
   );
 };
 
-// Generate Refresh Token
 userSchema.methods.refreshTokenGenerator = function () {
   return jwt.sign(
     {
@@ -109,7 +115,7 @@ userSchema.methods.refreshTokenGenerator = function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: "7d",
-    }
+    },
   );
 };
 

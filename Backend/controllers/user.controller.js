@@ -1,10 +1,19 @@
 import { User } from "../models/user.models.js";
-import { Post } from "../models/post.models.js"; 
+import { Post } from "../models/post.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import bcrypt from "bcryptjs"; 
+import bcrypt from "bcryptjs";
 export const userSignUp = async (req, res) => {
   try {
-    const { userName, password, email, name, profession, accountType, verified, profileUrl } = req.body;
+    const {
+      userName,
+      password,
+      email,
+      name,
+      profession,
+      accountType,
+      verified,
+      profileUrl,
+    } = req.body;
 
     if (!userName || !password || !email || !name) {
       return res.status(400).json({ message: "Incomplete credentials" });
@@ -12,7 +21,9 @@ export const userSignUp = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "User email already exists. Proceed to login page." });
+      return res
+        .status(400)
+        .json({ message: "User email already exists. Proceed to login page." });
     }
 
     const existingUserName = await User.findOne({ userName });
@@ -34,10 +45,12 @@ export const userSignUp = async (req, res) => {
     const activeToken = await newUser.activeToken();
     const refreshToken = await newUser.refreshTokenGenerator();
     newUser.refreshToken = refreshToken;
-    
+
     await newUser.save({ validateBeforeSave: false });
 
-    const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
+    const createdUser = await User.findById(newUser._id).select(
+      "-password -refreshToken",
+    );
 
     return res.status(201).json({
       message: "User created successfully",
@@ -60,8 +73,8 @@ export const userSignIn = async (req, res) => {
       return res.status(400).json({ message: "Incomplete credentials" });
     }
 
-    let userExists = userName 
-      ? await User.findOne({ userName }) 
+    let userExists = userName
+      ? await User.findOne({ userName })
       : await User.findOne({ email });
 
     if (!userExists) {
@@ -76,12 +89,12 @@ export const userSignIn = async (req, res) => {
     const activeToken = await userExists.activeToken();
     const refreshToken = await userExists.refreshTokenGenerator();
     userExists.refreshToken = refreshToken;
-    
+
     await userExists.save({ validateBeforeSave: false });
 
     const userData = userExists.toObject();
     delete userData.password;
-    delete userData.refreshToken; 
+    delete userData.refreshToken;
 
     return res.status(200).json({
       message: "User logged in",
@@ -126,7 +139,7 @@ export const getCurrentUser = async (req, res) => {
 export const getUserProfile = async (req, res) => {
   try {
     const { userName } = req.params;
-    
+
     if (!userName) {
       return res.status(400).json({ message: "Username is required" });
     }
@@ -184,39 +197,33 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-
 export const uploadProfile = async (req, res) => {
   try {
-    const userId = req.userId; 
-    
-    // ✅ FIX: Added userName to the destructuring here so it's defined!
+    const userId = req.userId;
+
     const { name, userName, profession, oldPassword, newPassword } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    // 1. Find User (We need the password field to verify the old password)
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // 2. Update Text Fields safely
     if (name) user.name = name;
-    if (userName) user.userName = userName; // ✅ This will now work perfectly
+    if (userName) user.userName = userName;
     if (profession) user.profession = profession;
 
-    // 3. Securely Update Password
     if (oldPassword && newPassword) {
       const isMatch = await bcrypt.compare(oldPassword, user.password);
       if (!isMatch) {
         return res.status(400).json({ message: "Incorrect old password." });
       }
-      user.password = newPassword; // Mongoose 'pre-save' hook hashes this automatically
+      user.password = newPassword;
     }
 
-    // 4. Handle Cloudinary Profile Image Upload
     const localFilePath = req.file?.path;
     if (localFilePath) {
       const cloudinaryResponse = await uploadOnCloudinary(localFilePath);
@@ -225,10 +232,8 @@ export const uploadProfile = async (req, res) => {
       }
     }
 
-    // Save everything at once
     await user.save();
 
-    // 5. Clean up data before sending to frontend
     const updatedUser = user.toObject();
     delete updatedUser.password;
     delete updatedUser.refreshToken;
@@ -238,7 +243,6 @@ export const uploadProfile = async (req, res) => {
       user: updatedUser,
       profileUrl: updatedUser.profileUrl,
     });
-
   } catch (error) {
     return res.status(500).json({
       message: "Something went wrong while updating the profile",
@@ -251,15 +255,50 @@ export const uploadProfile = async (req, res) => {
 export const getMyPosts = async (req, res) => {
   try {
     const userId = req.userId;
-    // .populate("comments") is the magic key that fixes your 0 comments bug!
     const posts = await Post.find({ user: userId })
       .sort({ createdAt: -1 })
       .populate("user", "userName name profileUrl")
-      .populate("comments"); 
+      .populate("comments");
 
     return res.status(200).json({ posts });
   } catch (error) {
-    return res.status(500).json({ message: "Error fetching user posts", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Error fetching user posts", error: error.message });
+  }
+};
+export const requestVerification = async (req, res) => {
+  try {
+    const localFilePath = req.file?.path;
+    if (!localFilePath) {
+      return res
+        .status(400)
+        .json({ message: "Verification document file is required" });
+    }
+
+    const cloudinaryResponse = await uploadOnCloudinary(localFilePath);
+    if (!cloudinaryResponse) {
+      return res
+        .status(500)
+        .json({ message: "Failed to upload document to cloud storage" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { verificationDoc: cloudinaryResponse.secure_url },
+      { new: true, validateBeforeSave: false },
+    );
+
+    return res.status(200).json({
+      message:
+        "Verification document uploaded successfully. Awaiting admin review.",
+      documentUrl: user.verificationDoc,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong during verification document upload",
+      error: error.message,
+    });
   }
 };
 
@@ -271,4 +310,5 @@ export default {
   getAllUsers,
   uploadProfile,
   getMyPosts,
+  requestVerification,
 };
