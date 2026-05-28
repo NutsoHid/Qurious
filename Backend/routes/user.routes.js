@@ -14,18 +14,29 @@ import { getMyPosts } from "../controllers/user.controller.js";
 
 const Userrouter = express.Router();
 
-Userrouter.post("/signup", userSignUp);
+Userrouter.post(
+  "/signup",
+  upload.fields([
+    { name: "profileImage", maxCount: 1 },
+    { name: "document", maxCount: 1 },
+  ]),
+  userSignUp,
+);
+
 Userrouter.post("/signin", userSignIn);
 Userrouter.get("/profile/:userName", getUserProfile);
+
 Userrouter.get("/me", verifyJWT, getCurrentUser);
 Userrouter.get("/all", verifyJWT, getAllUsers);
+Userrouter.get("/myPosts", verifyJWT, getMyPosts);
+
 Userrouter.post(
   "/profile",
   verifyJWT,
   upload.single("profileImage"),
   uploadProfile,
 );
-Userrouter.get("/myPosts", verifyJWT, getMyPosts);
+
 Userrouter.post(
   "/request-verification",
   verifyJWT,

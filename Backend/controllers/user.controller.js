@@ -12,7 +12,6 @@ export const userSignUp = async (req, res) => {
       profession,
       accountType,
       verified,
-      profileUrl,
     } = req.body;
 
     if (!userName || !password || !email || !name) {
@@ -31,6 +30,26 @@ export const userSignUp = async (req, res) => {
       return res.status(400).json({ message: "Username already exists" });
     }
 
+    const profileImageLocalPath = req.files?.profileImage?.[0]?.path;
+    const documentLocalPath = req.files?.document?.[0]?.path;
+
+    let finalProfileUrl = "";
+    let verificationDocUrl = "";
+
+    if (profileImageLocalPath) {
+      const cloudinaryProfile = await uploadOnCloudinary(profileImageLocalPath);
+      if (cloudinaryProfile) {
+        finalProfileUrl = cloudinaryProfile.secure_url;
+      }
+    }
+
+    if (documentLocalPath) {
+      const cloudinaryDoc = await uploadOnCloudinary(documentLocalPath);
+      if (cloudinaryDoc) {
+        verificationDocUrl = cloudinaryDoc.secure_url;
+      }
+    }
+
     const newUser = await User.create({
       userName,
       password,
@@ -39,7 +58,8 @@ export const userSignUp = async (req, res) => {
       profession,
       accountType,
       verified,
-      profileUrl,
+      profileUrl: finalProfileUrl,
+      verificationDoc: verificationDocUrl,
     });
 
     const activeToken = await newUser.activeToken();
@@ -269,6 +289,8 @@ export const getMyPosts = async (req, res) => {
 };
 export const requestVerification = async (req, res) => {
   try {
+    const userId = req.userId;
+
     const localFilePath = req.file?.path;
     if (!localFilePath) {
       return res
@@ -284,10 +306,14 @@ export const requestVerification = async (req, res) => {
     }
 
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      userId,
       { verificationDoc: cloudinaryResponse.secure_url },
       { new: true, validateBeforeSave: false },
     );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     return res.status(200).json({
       message:
@@ -301,7 +327,6 @@ export const requestVerification = async (req, res) => {
     });
   }
 };
-
 export default {
   userSignUp,
   userSignIn,

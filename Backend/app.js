@@ -12,6 +12,7 @@ import voteRouter from "./Routes/vote.route.js";
 import reportRouter from "./Routes/report.route.js";
 import followRouter from "./Routes/follow.route.js";
 import adminRouter from "./Routes/admin.route.js";
+import messageRouter from "./Routes/message.routes.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/api/vote", voteRouter);
 app.use("/api/report", reportRouter);
 app.use("/api/follow", followRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/message", messageRouter);
 
 app.listen(process.env.PORT, (req, res) => {
   connect()
