@@ -14,7 +14,7 @@ import followRouter from "./Routes/follow.route.js";
 import adminRouter from "./Routes/admin.route.js";
 import messageRouter from "./Routes/message.routes.js";
 
-const app = express();
+import { app, server } from "./socket/socket.js";
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,12 +27,14 @@ app.use("/api/follow", followRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/message", messageRouter);
 
-app.listen(process.env.PORT, (req, res) => {
+server.listen(process.env.PORT, () => {
   connect()
     .then(() => {
-      console.log(`Server started at ${process.env.PORT}`);
+      console.log(
+        `⚙️  Server and WebSockets started cleanly at port: ${process.env.PORT}`,
+      );
     })
-    .catch(() => {
-      console.log(`Server start failed`);
+    .catch((err) => {
+      console.log(`❌ Server start failed:`, err.message);
     });
 });
