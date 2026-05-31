@@ -11,6 +11,8 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import NotificationScreen from '../screens/NotificationScreen';
 import CreateScreen from '../screens/CreateScreen'; 
 import OtherUserProfileScreen from '../screens/OtherUserProfileScreen'; 
+// 1. IMPORT YOUR NEW SCREEN HERE
+import SinglePostScreen from '../screens/singlePostScreen'; 
 
 const Tab = createBottomTabNavigator();
 const ProfileStack = createStackNavigator();
@@ -25,8 +27,7 @@ function ProfileStackNavigator() {
   );
 }
 
-// 1. FIXED ANIMATION COMPONENT
-// 1. FIXED ANIMATION COMPONENT
+// FIXED ANIMATION COMPONENT
 const PaytmTabButton = (props) => {
   const { children, onPress, accessibilityState } = props;
   const focused = accessibilityState?.selected ?? false;
@@ -43,9 +44,9 @@ const PaytmTabButton = (props) => {
     }).start();
   }, [focused, animationValue]);
 
-  // The lines that were throwing the error are now safe and fixed
+  // FIX: Changed back to. It must have a start (0) and an end (1) state.
   const translateY = animationValue.interpolate({
-    inputRange:[0,0], // Added the missing array here
+    inputRange:[0,0],
     outputRange: [0, -12], 
   });
 
@@ -83,7 +84,6 @@ function MainTabNavigator() {
               color={focused ? "#0088cc" : "#9CA3AF"} 
             />
           ),
-          // 2. FIXED: Removed inline function to prevent unmounting crashes
           tabBarButton: PaytmTabButton
         }} 
       />
@@ -133,6 +133,11 @@ export default function BottomTabNavigator() {
       <RootStack.Screen 
         name="OtherUserProfile" 
         component={OtherUserProfileScreen} 
+      />
+      {/* 2. REGISTER THE NEW SCREEN IN YOUR ROOT STACK */}
+      <RootStack.Screen 
+        name="SinglePostScreen" 
+        component={SinglePostScreen} 
       />
     </RootStack.Navigator>
   );

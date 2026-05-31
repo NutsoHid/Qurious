@@ -7,7 +7,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-// IMPORT useFocusEffect to trigger updates when the screen comes into view
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
@@ -17,6 +16,7 @@ export default function ProfileScreen({ navigation }) {
   const { user, logout, updateUserContext } = useContext(AuthContext);
   
   // Data State
+  const [localProfile, setLocalProfile] = useState(user); // 🔥 FIX: Local state for immediate UI updates
   const [myPosts, setMyPosts] = useState([]);
   const [myComments, setMyComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,6 @@ export default function ProfileScreen({ navigation }) {
   const [newProfileImage, setNewProfileImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // useFocusEffect runs every time this screen becomes the active screen
   useFocusEffect(
     useCallback(() => {
       fetchUserData();
@@ -41,7 +40,6 @@ export default function ProfileScreen({ navigation }) {
 
   const fetchUserData = async () => {
     try {
-      // 1. THE FIX: Added the profile endpoint to get fresh follower/following counts
       const [postsRes, commentsRes, profileRes] = await Promise.all([
         api.get('/user/myPosts'),
         api.get('/comment/myComments'),
@@ -51,9 +49,13 @@ export default function ProfileScreen({ navigation }) {
       setMyPosts(postsRes.data.posts || []);
       setMyComments(commentsRes.data.comments || []);
 
-      // 2. THE FIX: Update the global user context if fresh data is received
-      if (profileRes.data?.profile && updateUserContext) {
-        updateUserContext(profileRes.data.profile);
+      const fetchedProfile = profileRes.data?.profile;
+      if (fetchedProfile) {
+        setLocalProfile(fetchedProfile); // 🔥 FIX: Update local state to instantly refresh followers count
+        
+        if (updateUserContext) {
+          updateUserContext(fetchedProfile);
+        }
       }
       
     } catch (error) {
@@ -69,7 +71,6 @@ export default function ProfileScreen({ navigation }) {
     fetchUserData();
   };
 
-  // SECURE LOGOUT FUNCTION
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to log out of Qurious?", [
       { text: "Cancel", style: "cancel" },
@@ -77,21 +78,19 @@ export default function ProfileScreen({ navigation }) {
     ]);
   };
 
-  // Image Picker Logic
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], 
       allowsEditing: true,
-      aspect:0,
+      aspect: [1, 1],
       quality: 0.8,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setNewProfileImage(result.assets.uri);
+      setNewProfileImage(result.assets[0].uri);
     }
   };
 
-  // Submit Profile Updates
   const handleUpdateProfile = async () => {
     setIsSubmitting(true);
     try {
@@ -112,7 +111,7 @@ export default function ProfileScreen({ navigation }) {
       if (newProfileImage) {
         let filename = newProfileImage.split('/').pop();
         let match = /\.(\w+)$/.exec(filename);
-        let type = match ? `image/${match}` : `image`;
+        let type = match ? `image/${match[1]}` : `image/jpeg`;
         formData.append('profileImage', { uri: newProfileImage, name: filename, type });
       }
 
@@ -122,6 +121,7 @@ export default function ProfileScreen({ navigation }) {
 
       if (updateUserContext && response.data.user) {
         updateUserContext(response.data.user);
+        setLocalProfile(response.data.user); // Update local profile after edit
       }
 
       Alert.alert("Success", "Your profile has been updated!");
@@ -139,18 +139,45 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const renderCommentItem = ({ item }) => (
-    <View style={styles.commentCard}>
-      <Text style={styles.commentPostTitle}>
-        Commented on: {item.post?.title || 'A deleted post'}
-      </Text>
-      <View style={styles.commentContentBox}>
-        <Text style={styles.commentText}>{item.content}</Text>
-      </View>
-    </View>
-  );
+  const handleCommentPress = (postId) => {
+    if (!postId) {
+      Alert.alert("Unavailable", "The original post has been deleted.");
+      return;
+    }
+    navigation.navigate('SinglePostScreen', { postId });
+  };
 
-  const displayAvatar = user?.profileUrl || 'https://via.placeholder.com/150';
+  const renderCommentItem = ({ item }) => {
+    const dateText = item.createdAt 
+      ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) 
+      : '';
+
+    return (
+      <TouchableOpacity 
+        style={styles.commentCard} 
+        activeOpacity={0.7}
+        onPress={() => handleCommentPress(item.post?._id)} 
+      >
+        <View style={styles.commentHeader}>
+          <Ionicons name="chatbubble-outline" size={14} color="#6B7280" style={styles.commentIcon} />
+          <Text style={styles.commentMetaText}>You replied to a post</Text>
+          {dateText ? <Text style={styles.commentDate}> • {dateText}</Text> : null}
+        </View>
+        
+        <View style={styles.referencedPostBox}>
+          <Text style={styles.commentPostTitle} numberOfLines={1}>
+            {item.post?.title || 'This post has been deleted'}
+          </Text>
+        </View>
+
+        <View style={styles.commentBody}>
+          <Text style={styles.commentText}>{item.content}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const displayAvatar = localProfile?.profileUrl || 'https://via.placeholder.com/150';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -168,25 +195,25 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.profileInfoContainer}>
           <Image source={{ uri: displayAvatar }} style={styles.profileAvatar} />
           <View style={styles.profileTextContainer}>
-            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
-            <Text style={styles.profileHandle}>@{user?.userName || 'username'}</Text>
-            {user?.profession ? (
+            <Text style={styles.profileName}>{localProfile?.name || 'User'}</Text>
+            <Text style={styles.profileHandle}>@{localProfile?.userName || 'username'}</Text>
+            {localProfile?.profession ? (
               <View style={styles.professionBadge}>
-                <Text style={styles.professionText}>{user.profession}</Text>
+                <Text style={styles.professionText}>{localProfile.profession}</Text>
               </View>
             ) : null}
           </View>
         </View>
 
-        {/* FOLLOWERS & FOLLOWING STATS ROW (Now dynamic) */}
+        {/* FOLLOWERS & FOLLOWING STATS ROW */}
         <View style={styles.socialStatsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statCount}>{user?.followers?.length || 0}</Text>
+            <Text style={styles.statCount}>{localProfile?.followers?.length || 0}</Text>
             <Text style={styles.statLabel}>Followers</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statCount}>{user?.following?.length || 0}</Text>
+            <Text style={styles.statCount}>{localProfile?.following?.length || 0}</Text>
             <Text style={styles.statLabel}>Following</Text>
           </View>
         </View>
@@ -322,18 +349,65 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
   activeTabText: { color: '#0088cc' },
 
-  // Feed Layout Overlap Protection
   feedScrollPadding: { paddingBottom: 110, paddingTop: 6 },
 
-  // Empty State Styles
   emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 20 },
   emptyText: { fontSize: 16, color: '#9CA3AF', marginTop: 15, textAlign: 'center', fontWeight: '500' },
 
-  // Comment Card Cardboards
-  commentCard: { backgroundColor: '#fff', padding: 15, marginHorizontal: 15, marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
-  commentPostTitle: { fontSize: 13, color: '#0088cc', marginBottom: 8, fontWeight: '700' },
-  commentContentBox: { backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB' },
-  commentText: { fontSize: 15, color: '#374151', lineHeight: 22 },
+  // --- REDESIGNED COMMENT CARD STYLES ---
+  commentCard: { 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    marginHorizontal: 16, 
+    marginTop: 12, 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: '#F3F4F6', 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.04, 
+    shadowRadius: 4, 
+    elevation: 2 
+  },
+  commentHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 10 
+  },
+  commentIcon: { 
+    marginRight: 6,
+    marginTop: 1
+  },
+  commentMetaText: { 
+    fontSize: 13, 
+    color: '#6B7280', 
+    fontWeight: '500' 
+  },
+  commentDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  referencedPostBox: { 
+    borderLeftWidth: 3, 
+    borderLeftColor: '#0088cc', 
+    paddingLeft: 12, 
+    marginBottom: 12,
+    paddingVertical: 2
+  },
+  commentPostTitle: { 
+    fontSize: 14, 
+    color: '#4B5563', 
+    fontWeight: '600',
+    fontStyle: 'italic'
+  },
+  commentBody: { 
+    marginTop: 2 
+  },
+  commentText: { 
+    fontSize: 15, 
+    color: '#111827', 
+    lineHeight: 22 
+  },
 
   // Modal Styles
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },

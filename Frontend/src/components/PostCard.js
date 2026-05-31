@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -25,16 +25,30 @@ const formatSocialDate = (dateInput) => {
   return posted.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-export default function PostCard({ post, disableProfileClick = false, onOpenComments, onPostDeleted, onVote }) {
+export default function PostCard({ post, disableProfileClick = false, onOpenComments, onPostDeleted }) {
   const navigation = useNavigation();
   const { user: currentUser } = useContext(AuthContext);
+
+  const [likes, setLikes] = useState(post.likes || []);
+  const [dislikes, setDislikes] = useState(post.dislikes || []);
+
+  useEffect(() => {
+    setLikes(post.likes || []);
+    setDislikes(post.dislikes || []);
+  }, [post]);
   
-  const voteState = post.likes?.includes(currentUser?._id) 
+  // Helper function to safely check arrays whether they contain strings OR objects
+  const isUserInArray = (arr, userId) => {
+    return arr.some(item => item === userId || item?._id === userId);
+  };
+
+  // Calculate states dynamically using the safe helper
+  const voteState = isUserInArray(likes, currentUser?._id) 
     ? 'like' 
-    : (post.dislikes?.includes(currentUser?._id) ? 'dislike' : null);
+    : (isUserInArray(dislikes, currentUser?._id) ? 'dislike' : null);
   
-  const likesCount = post.likes?.length || 0;
-  const dislikesCount = post.dislikes?.length || 0;
+  const likesCount = likes.length;
+  const dislikesCount = dislikes.length;
 
   const authorName = post.anonymous ? 'Anonymous' : (post.user?.name || 'Unknown User');
   const authorHandle = post.anonymous ? '@hidden' : (post.user?.userName || 'unknown');
@@ -46,17 +60,12 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
   const isAdmin = currentUser?.accountType === 'admin';
   const totalComments = post.comments ? post.comments.length : 0;
 
-  // 🔥 NEW: Dynamic Category Badge Colors for the Feed
   const getCategoryBadgeStyle = (cat) => {
     switch(cat) {
-      case 'Health': 
-        return { bg: '#FEE2E2', text: '#EF4444' }; // Soft Red background, Solid Red text
-      case 'Education': 
-        return { bg: '#E0F2FE', text: '#0088cc' }; // Soft Blue background, Solid Blue text
-      case 'Social': 
-        return { bg: '#D1FAE5', text: '#10B981' }; // Soft Green background, Solid Green text
-      default: 
-        return { bg: '#E0F2FE', text: '#0088cc' }; // Fallback Blue
+      case 'Health': return { bg: '#FEE2E2', text: '#EF4444' }; 
+      case 'Education': return { bg: '#E0F2FE', text: '#0088cc' }; 
+      case 'Social': return { bg: '#D1FAE5', text: '#10B981' }; 
+      default: return { bg: '#E0F2FE', text: '#0088cc' }; 
     }
   };
 
@@ -107,6 +116,45 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
     }
   };
 
+  const handleVote = async (isUpvote) => {
+    if (!currentUser) return;
+    
+    const userId = currentUser._id;
+    let newLikes = [...likes];
+    let newDislikes = [...dislikes];
+
+    // Safely filter out the user regardless of whether the state holds objects or strings
+    if (isUpvote) {
+      if (voteState === 'like') {
+        newLikes = newLikes.filter(item => (item?._id || item) !== userId); 
+      } else {
+        newLikes.push(userId); 
+        newDislikes = newDislikes.filter(item => (item?._id || item) !== userId);
+      }
+    } else {
+      if (voteState === 'dislike') {
+        newDislikes = newDislikes.filter(item => (item?._id || item) !== userId);
+      } else {
+        newDislikes.push(userId); 
+        newLikes = newLikes.filter(item => (item?._id || item) !== userId); 
+      }
+    }
+
+    setLikes(newLikes);
+    setDislikes(newDislikes);
+
+    try {
+      // 🔥 FIX: Replaced 'action' with 'isLike' to match your Mongoose schema
+      await api.post(`/vote/toggleVote/Post/${post._id}`, { 
+        isLike: isUpvote 
+      });
+    } catch (error) {
+      console.error("Vote failed:", error);
+      setLikes(post.likes || []);
+      setDislikes(post.dislikes || []);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -127,7 +175,6 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
         </TouchableOpacity>
         
         <View style={styles.rightHeader}>
-          {/* 🔥 APPLIED DYNAMIC CATEGORY STYLES HERE */}
           <View style={[styles.categoryBadge, { backgroundColor: badgeColors.bg }]}>
             <Text style={[styles.categoryText, { color: badgeColors.text }]}>
               {post.category || 'Social'}
@@ -151,10 +198,9 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
 
       <View style={styles.actionRow}>
         
-        {/* UPVOTE BUTTON PILL */}
         <TouchableOpacity 
           style={[styles.pillButton, voteState === 'like' && styles.activeLikePill]} 
-          onPress={() => onVote && onVote(true)}
+          onPress={() => handleVote(true)} 
         >
           <Ionicons 
             name={voteState === 'like' ? "arrow-up-circle" : "arrow-up-circle-outline"} 
@@ -166,10 +212,9 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
           </Text>
         </TouchableOpacity>
 
-        {/* DOWNVOTE BUTTON PILL */}
         <TouchableOpacity 
           style={[styles.pillButton, voteState === 'dislike' && styles.activeDislikePill]} 
-          onPress={() => onVote && onVote(false)}
+          onPress={() => handleVote(false)} 
         >
           <Ionicons 
             name={voteState === 'dislike' ? "arrow-down-circle" : "arrow-down-circle-outline"} 
@@ -181,7 +226,6 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
           </Text>
         </TouchableOpacity>
 
-        {/* COMMENT BUTTON PILL */}
         <TouchableOpacity style={styles.pillButton} onPress={onOpenComments}>
           <Ionicons name="chatbubble-ellipses-outline" size={18} color="#4B5563" />
           <Text style={styles.pillText}>{totalComments}</Text>
@@ -205,7 +249,6 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 13, color: '#6B7280', fontWeight: '400' },
   handle: { fontSize: 13, color: '#6B7280', marginTop: 1 },
   
-  // Notice background and text colors are removed here because they are applied inline dynamically
   categoryBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   categoryText: { fontSize: 12, fontWeight: '700' },
   
