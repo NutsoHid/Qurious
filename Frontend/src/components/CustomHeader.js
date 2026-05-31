@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function CustomHeader({ onMenuPress, onMessagePress }) {
+export default function CustomHeader({ onMenuPress, onCreatePress }) {
   return (
     <View style={styles.headerContainer}>
       
-      {/* Menu Button */}
+      {/* Menu/Hamburger Button */}
       <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn}>
         <Ionicons name="menu" size={28} color="#111827" />
       </TouchableOpacity>
@@ -14,9 +14,9 @@ export default function CustomHeader({ onMenuPress, onMessagePress }) {
       {/* App Title */}
       <Text style={styles.headerTitle}>Qurious</Text>
 
-      {/* Message Button (Replaced Search) */}
-      <TouchableOpacity style={styles.iconBtn} onPress={onMessagePress}>
-        <Ionicons name="chatbubbles-outline" size={26} color="#111827" />
+      {/* Create Post Icon Header Interface */}
+      <TouchableOpacity style={styles.iconBtn} onPress={onCreatePress}>
+        <Ionicons name="add-circle-outline" size={28} color="#111827" />
       </TouchableOpacity>
       
     </View>
@@ -28,11 +28,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    paddingHorizontal: 15, 
+    paddingHorizontal: 16, 
     paddingVertical: 12, 
     backgroundColor: '#fff', 
     borderBottomWidth: 1, 
-    borderBottomColor: '#f0f0f0' 
+    borderBottomColor: '#f3f4f6' 
   },
   headerTitle: { 
     fontSize: 22, 
@@ -41,6 +41,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5
   },
   iconBtn: {
-    padding: 5
+    padding: 4
   }
 });

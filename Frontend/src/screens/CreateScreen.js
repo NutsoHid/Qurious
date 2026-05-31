@@ -14,12 +14,11 @@ export default function CreateScreen({ navigation }) {
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [category, setCategory] = useState('Social'); // Default
+  const [category, setCategory] = useState('Social'); 
   const [image, setImage] = useState(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pick an image from phone gallery
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -41,32 +40,26 @@ export default function CreateScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
-      // We MUST use FormData because we are sending a physical image file to Cloudinary
       const formData = new FormData();
       formData.append('title', title);
       formData.append('content', content);
       formData.append('category', category);
-      
-      // Convert boolean to string for FormData
       formData.append('anonymous', String(isAnonymous));
 
-      // Append image if user selected one
       if (image) {
         let filename = image.split('/').pop();
         let match = /\.(\w+)$/.exec(filename);
         let type = match ? `image/${match[1]}` : `image`;
-
-        // 'postImage' matches your backend configuration
         formData.append('postImage', { uri: image, name: filename, type });
       }
 
+      // Your api.js interceptor automatically handles the Bearer token authorization header!
       await api.post('/post/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      // ✅ FIX: Clear all input states immediately on success before navigating away
       setTitle('');
       setContent('');
       setImage(null);
@@ -74,7 +67,7 @@ export default function CreateScreen({ navigation }) {
       setCategory('Social');
 
       Alert.alert('Success!', 'Your post is live.');
-      navigation.goBack(); // Return to Feed
+      navigation.goBack(); 
     } catch (error) {
       console.log(error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to create post');
@@ -83,35 +76,54 @@ export default function CreateScreen({ navigation }) {
     }
   };
 
-  // Determine what avatar/name to show based on Anonymous toggle
   const displayAvatar = isAnonymous 
     ? 'https://cdn-icons-png.flaticon.com/512/149/149071.png' 
     : (user?.profileUrl || 'https://via.placeholder.com/150');
   
   const displayName = isAnonymous ? 'Anonymous' : (user?.name || 'User');
 
+  const getCategoryActiveStyle = (cat) => {
+    if (category !== cat) return {};
+    switch(cat) {
+      case 'Health': return { backgroundColor: '#EF4444', borderColor: '#EF4444' };
+      case 'Education': return { backgroundColor: '#0088cc', borderColor: '#0088cc' };
+      case 'Social': return { backgroundColor: '#10B981', borderColor: '#10B981' };
+      default: return { backgroundColor: '#0088cc', borderColor: '#0088cc' };
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      
-      {/* 1. PREMIUM HEADER */}
+      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-          <Ionicons name="close" size={28} color="#111827" />
+          <Ionicons name="close" size={26} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Post</Text>
+        <Text style={styles.headerTitle}>Create Post</Text>
         <TouchableOpacity 
           onPress={handlePost} 
           disabled={isSubmitting || !title.trim() || !content.trim()} 
           style={[styles.postBtn, (!title.trim() || !content.trim()) && styles.postBtnDisabled]}
         >
-          {isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.postBtnText}>Post</Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          
-          {/* 2. USER INFO & ANONYMOUS TOGGLE */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* USER INFO & ANONYMOUS TOGGLE */}
           <View style={styles.userRow}>
             <View style={styles.userInfo}>
               <Image source={{ uri: displayAvatar }} style={styles.avatar} />
@@ -129,65 +141,71 @@ export default function CreateScreen({ navigation }) {
                 ios_backgroundColor="#D1D5DB"
                 onValueChange={() => setIsAnonymous(!isAnonymous)}
                 value={isAnonymous}
+                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }} 
               />
             </View>
           </View>
 
-          {/* 3. CATEGORY SELECTOR (SCROLLABLE PILLS) */}
+          {/* CATEGORY SELECTOR */}
           <View style={styles.categoryContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {['Social', 'Health', 'Education', 'Trending'].map((cat) => (
-                <TouchableOpacity 
-                  key={cat} 
-                  style={[styles.catBadge, category === cat && styles.catBadgeActive]}
-                  onPress={() => setCategory(cat)}
-                >
-                  <Text style={[styles.catText, category === cat && styles.catTextActive]}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={styles.sectionLabel}>TOPIC</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+              {['Social', 'Health', 'Education'].map((cat) => {
+                const isActive = category === cat;
+                return (
+                  <TouchableOpacity 
+                    key={cat} 
+                    style={[styles.catBadge, isActive && getCategoryActiveStyle(cat)]}
+                    onPress={() => setCategory(cat)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.catText, isActive && styles.catTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
 
-          {/* 4. SEAMLESS TEXT INPUTS */}
-          <TextInput
-            style={styles.titleInput}
-            placeholder="An interesting title..."
-            placeholderTextColor="#9CA3AF"
-            value={title}
-            onChangeText={setTitle}
-            maxLength={100}
-          />
+          {/* TEXT INPUTS */}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="An interesting title..."
+              placeholderTextColor="#D1D5DB"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+            />
+            <TextInput
+              style={styles.contentInput}
+              placeholder="What do you want to talk about?"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={content}
+              onChangeText={setContent}
+              textAlignVertical="top"
+            />
+          </View>
 
-          <TextInput
-            style={styles.contentInput}
-            placeholder="What do you want to talk about?"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            value={content}
-            onChangeText={setContent}
-            textAlignVertical="top"
-          />
-
-          {/* 5. BEAUTIFUL IMAGE PREVIEW */}
+          {/* IMAGE PREVIEW */}
           {image && (
             <View style={styles.imagePreviewContainer}>
               <Image source={{ uri: image }} style={styles.imagePreview} />
               <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage(null)}>
-                <Ionicons name="close-circle" size={28} color="#fff" />
+                <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           )}
-
         </ScrollView>
 
-        {/* 6. BOTTOM TOOLBAR FOR GALLERY */}
+        {/* BOTTOM TOOLBAR */}
         <View style={styles.toolbar}>
-          <TouchableOpacity style={styles.toolBtn} onPress={pickImage}>
-            <Ionicons name="image-outline" size={26} color="#0088cc" />
+          <TouchableOpacity style={styles.toolBtn} onPress={pickImage} activeOpacity={0.7}>
+            <Ionicons name="image" size={22} color="#0088cc" />
             <Text style={styles.toolText}>Add Photo</Text>
           </TouchableOpacity>
+          <Text style={styles.charCount}>{title.length}/100</Text>
         </View>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -195,37 +213,35 @@ export default function CreateScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  iconBtn: { padding: 5 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  postBtn: { backgroundColor: '#0088cc', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  keyboardView: { flex: 1, justifyContent: 'space-between' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: '#ffffff', zIndex: 10 },
+  iconBtn: { padding: 4, marginLeft: -4 },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  postBtn: { backgroundColor: '#0088cc', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 24, justifyContent: 'center', alignItems: 'center', minWidth: 70 },
   postBtnDisabled: { backgroundColor: '#93C5FD' },
-  postBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  
-  scrollContent: { paddingHorizontal: 20, paddingTop: 15, paddingBottom: 100 },
-  
-  userRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  postBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  userRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
   userInfo: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 46, height: 46, borderRadius: 23, marginRight: 12, backgroundColor: '#F3F4F6' },
-  userName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  userHandle: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  anonymousToggle: { alignItems: 'center' },
-  anonymousText: { fontSize: 11, fontWeight: '600', color: '#6B7280', marginBottom: 4 },
-
-  categoryContainer: { marginBottom: 20, marginRight: -20 },
-  catBadge: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 10 },
-  catBadgeActive: { backgroundColor: '#0088cc' },
-  catText: { color: '#6B7280', fontWeight: '600', fontSize: 14 },
+  avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: '#F3F4F6' },
+  userName: { fontSize: 16, fontWeight: '700', color: '#111827', letterSpacing: 0.2 },
+  userHandle: { fontSize: 13, color: '#6B7280', marginTop: 2, fontWeight: '500' },
+  anonymousToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+  anonymousText: { fontSize: 13, fontWeight: '600', color: '#374151', marginRight: 8 },
+  categoryContainer: { marginBottom: 24 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1.2, marginBottom: 12 },
+  categoryScroll: { marginRight: -20, paddingRight: 20 },
+  catBadge: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 10, borderWidth: 1, borderColor: '#F3F4F6' },
+  catText: { color: '#6B7280', fontWeight: '600', fontSize: 13 },
   catTextActive: { color: '#ffffff' },
-
-  titleInput: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 15 },
-  contentInput: { fontSize: 18, color: '#374151', minHeight: 150, lineHeight: 26 },
-  
-  imagePreviewContainer: { marginTop: 15, position: 'relative', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
-  imagePreview: { width: '100%', height: 250, borderRadius: 16 },
-  removeImageBtn: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 15 },
-  
-  toolbar: { borderTopWidth: 1, borderColor: '#F3F4F6', backgroundColor: '#fff', padding: 15, flexDirection: 'row', alignItems: 'center' },
-  toolBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
-  toolText: { marginLeft: 8, fontSize: 15, color: '#0088cc', fontWeight: '700' }
+  inputContainer: { marginBottom: 20 },
+  titleInput: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 12, lineHeight: 28 }, 
+  contentInput: { fontSize: 16, color: '#374151', minHeight: 160, lineHeight: 24, fontWeight: '400' }, 
+  imagePreviewContainer: { marginTop: 10, position: 'relative', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
+  imagePreview: { width: '100%', height: 260, borderRadius: 16, backgroundColor: '#F3F4F6' },
+  removeImageBtn: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(17, 24, 39, 0.7)', borderRadius: 20, padding: 6 },
+  toolbar: { borderTopWidth: 1, borderColor: '#F3F4F6', backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toolBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  toolText: { marginLeft: 6, fontSize: 14, color: '#0088cc', fontWeight: '700' },
+  charCount: { fontSize: 12, color: '#9CA3AF', fontWeight: '600' }
 });

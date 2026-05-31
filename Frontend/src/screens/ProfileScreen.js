@@ -1,349 +1,356 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import { 
   View, Text, StyleSheet, Image, TouchableOpacity, FlatList, 
-  ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, ScrollView
+  ActivityIndicator, RefreshControl, Modal, TextInput, 
+  KeyboardAvoidingView, Platform, Alert, ScrollView 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+// IMPORT useFocusEffect to trigger updates when the screen comes into view
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import PostCard from '../components/PostCard'; 
+import PostCard from '../components/PostCard';
 
 export default function ProfileScreen({ navigation }) {
-  // Make sure you have a logout function in your AuthContext!
-  const { user, setUser, logout } = useContext(AuthContext); 
+  const { user, logout, updateUserContext } = useContext(AuthContext);
   
+  // Data State
   const [myPosts, setMyPosts] = useState([]);
   const [myComments, setMyComments] = useState([]);
-  const [activeTab, setActiveTab] = useState('posts'); // 'posts' or 'comments'
-  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+  const [activeTab, setActiveTab] = useState('posts'); 
+
   // Edit Profile State
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editProfession, setEditProfession] = useState(user?.profession || '');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newAvatar, setNewAvatar] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [newProfileImage, setNewProfileImage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
+  // useFocusEffect runs every time this screen becomes the active screen
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+    }, [user?.userName])
+  );
 
   const fetchUserData = async () => {
-    setLoading(true);
     try {
-      // We fetch both Posts and Comments at the same time!
-      const [postsRes, commentsRes] = await Promise.all([
+      // 1. THE FIX: Added the profile endpoint to get fresh follower/following counts
+      const [postsRes, commentsRes, profileRes] = await Promise.all([
         api.get('/user/myPosts'),
-        api.get('/comment/myComments') // This hits the route your friend made earlier!
+        api.get('/comment/myComments'),
+        api.get(`/user/profile/${user?.userName}`) 
       ]);
+
       setMyPosts(postsRes.data.posts || []);
       setMyComments(commentsRes.data.comments || []);
+
+      // 2. THE FIX: Update the global user context if fresh data is received
+      if (profileRes.data?.profile && updateUserContext) {
+        updateUserContext(profileRes.data.profile);
+      }
+      
     } catch (error) {
-      console.log("Error fetching profile data:", error);
+      console.log("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUserData();
+  };
+
+  // SECURE LOGOUT FUNCTION
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
+    Alert.alert("Logout", "Are you sure you want to log out of Qurious?", [
       { text: "Cancel", style: "cancel" },
-      { 
-        text: "Logout", 
-        style: "destructive", 
-        onPress: () => {
-          if (logout) {
-            logout();
-          } else {
-            console.log("Please add logout() to your AuthContext!");
-          }
-        }
-      }
+      { text: "Logout", style: "destructive", onPress: () => logout() }
     ]);
   };
 
+  // Image Picker Logic
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images'], 
       allowsEditing: true,
-      aspect: [1, 1],
+      aspect:0,
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets.length > 0) {
-      setNewAvatar(result.assets[0].uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setNewProfileImage(result.assets.uri);
     }
   };
 
- const handleSaveProfile = async () => {
-    setIsSaving(true);
+  // Submit Profile Updates
+  const handleUpdateProfile = async () => {
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       
-      // Append text data safely
-      if (editName && editName !== user.name) formData.append('name', editName);
-      if (editProfession && editProfession !== user.profession) formData.append('profession', editProfession);
+      if (editName) formData.append('name', editName);
+      if (editProfession) formData.append('profession', editProfession);
       
-      // Append password data
-      if (newPassword) {
-        if (!oldPassword) {
-          Alert.alert("Error", "Please enter your old password to set a new one.");
-          setIsSaving(false);
-          return;
-        }
+      if (oldPassword && newPassword) {
         formData.append('oldPassword', oldPassword);
         formData.append('newPassword', newPassword);
+      } else if (oldPassword || newPassword) {
+        Alert.alert("Hold up!", "Please enter both your old and new passwords to change it.");
+        setIsSubmitting(false);
+        return;
       }
 
-      if (newAvatar) {
-        let filename = newAvatar.split('/').pop();
+      if (newProfileImage) {
+        let filename = newProfileImage.split('/').pop();
         let match = /\.(\w+)$/.exec(filename);
-        
-        // ✅ FIX: Added [1] to properly grab the extension string!
-        let type = match ? `image/${match[1]}` : `image/jpeg`;
-
-        // Standardize jpg to jpeg (Multer prefers jpeg)
-        if (type === 'image/jpg') type = 'image/jpeg';
-
-        formData.append('profileImage', {
-          uri: Platform.OS === 'ios' ? newAvatar.replace('file://', '') : newAvatar,
-          name: filename,
-          type: type
-        });
+        let type = match ? `image/${match}` : `image`;
+        formData.append('profileImage', { uri: newProfileImage, name: filename, type });
       }
 
       const response = await api.post('/user/profile', formData, {
-        headers: { 
-          'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data' 
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Update local context/state so UI refreshes immediately
-      if (setUser) setUser(response.data.user);
-      
-      Alert.alert("Success", "Profile updated successfully!");
+      if (updateUserContext && response.data.user) {
+        updateUserContext(response.data.user);
+      }
+
+      Alert.alert("Success", "Your profile has been updated!");
       setEditModalVisible(false);
       
-      // Clear password fields for security
       setOldPassword('');
       setNewPassword('');
-      setNewAvatar(null);
+      setNewProfileImage(null);
       fetchUserData(); 
     } catch (error) {
-      console.log("Upload Error Details: ", error.response?.data || error.message);
+      console.log("Profile update error:", error);
       Alert.alert("Error", error.response?.data?.message || "Failed to update profile.");
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
-  // --- UI COMPONENTS ---
-
-  const renderComment = ({ item }) => (
+  const renderCommentItem = ({ item }) => (
     <View style={styles.commentCard}>
-      <View style={styles.commentHeader}>
-        <Ionicons name="chatbubble" size={16} color="#0088cc" />
-        <Text style={styles.commentPostTitle} numberOfLines={1}>
-          Commented on: {item.post?.title || 'Unknown Post'}
-        </Text>
-      </View>
-      <Text style={styles.commentContent}>{item.content}</Text>
-    </View>
-  );
-
-  const ProfileHeader = () => (
-    <View style={styles.headerContainer}>
-      <View style={styles.topRow}>
-        <Image 
-          source={{ uri: user?.profileUrl || 'https://via.placeholder.com/150' }} 
-          style={styles.profileAvatar} 
-        />
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{myPosts.length}</Text>
-            <Text style={styles.statLabel}>Posts</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{myComments.length}</Text>
-            <Text style={styles.statLabel}>Comments</Text>
-          </View>
-        </View>
-      </View>
-      
-      <Text style={styles.profileName}>{user?.name}</Text>
-      <Text style={styles.profileHandle}>@{user?.userName}</Text>
-      {user?.profession ? <Text style={styles.profileBio}>{user.profession}</Text> : null}
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.editBtn} onPress={() => setEditModalVisible(true)}>
-          <Text style={styles.editBtnText}>Edit Profile</Text>
-        </TouchableOpacity>
-        {/* 👇 Added the Logout Button here! */}
-      </View>
-
-      {/* 👇 Added the Posts vs Comments Tab System! */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'posts' && styles.activeTab]} 
-          onPress={() => setActiveTab('posts')}
-        >
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>My Posts</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'comments' && styles.activeTab]} 
-          onPress={() => setActiveTab('comments')}
-        >
-          <Text style={[styles.tabText, activeTab === 'comments' && styles.activeTabText]}>My Comments</Text>
-        </TouchableOpacity>
+      <Text style={styles.commentPostTitle}>
+        Commented on: {item.post?.title || 'A deleted post'}
+      </Text>
+      <View style={styles.commentContentBox}>
+        <Text style={styles.commentText}>{item.content}</Text>
       </View>
     </View>
   );
+
+  const displayAvatar = user?.profileUrl || 'https://via.placeholder.com/150';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      
-      <View style={styles.navBar}>
-        <Text style={styles.navTitle}>{user?.userName}</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={28} color="#EF4444" />
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* 1. DASHBOARD HEADER */}
+      <View style={styles.header}>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>My Dashboard</Text>
+          
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={20} color="#E0245E" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.profileInfoContainer}>
+          <Image source={{ uri: displayAvatar }} style={styles.profileAvatar} />
+          <View style={styles.profileTextContainer}>
+            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+            <Text style={styles.profileHandle}>@{user?.userName || 'username'}</Text>
+            {user?.profession ? (
+              <View style={styles.professionBadge}>
+                <Text style={styles.professionText}>{user.profession}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {/* FOLLOWERS & FOLLOWING STATS ROW (Now dynamic) */}
+        <View style={styles.socialStatsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statCount}>{user?.followers?.length || 0}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statCount}>{user?.following?.length || 0}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.editProfileBtn} onPress={() => setEditModalVisible(true)}>
+          <Text style={styles.editProfileBtnText}>Edit Profile</Text>
         </TouchableOpacity>
       </View>
 
+      {/* 2. TAB NAVIGATOR (POSTS vs COMMENTS) */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'posts' && styles.activeTabBtn]} 
+          onPress={() => setActiveTab('posts')}
+        >
+          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
+            My Posts ({myPosts.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'comments' && styles.activeTabBtn]} 
+          onPress={() => setActiveTab('comments')}
+        >
+          <Text style={[styles.tabText, activeTab === 'comments' && styles.activeTabText]}>
+            My Comments ({myComments.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 3. CONTENT FEED */}
       {loading ? (
-        <ActivityIndicator size="large" color="#0088cc" style={{ marginTop: 50 }} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#0088cc" />
+        </View>
       ) : (
         <FlatList
           data={activeTab === 'posts' ? myPosts : myComments}
           keyExtractor={(item) => item._id}
-          ListHeaderComponent={ProfileHeader}
-          renderItem={activeTab === 'posts' ? ({ item }) => <PostCard post={item} /> : renderComment}
+          renderItem={activeTab === 'posts' ? ({ item }) => <PostCard post={item} disableProfileClick={true} /> : renderCommentItem}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchUserData} tintColor="#0088cc" />}
+          contentContainerStyle={styles.feedScrollPadding}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0088cc" />}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name={activeTab === 'posts' ? "create-outline" : "chatbubbles-outline"} size={48} color="#D1D5DB" />
+            <View style={styles.emptyContainer}>
+              <Ionicons name={activeTab === 'posts' ? "document-text-outline" : "chatbubbles-outline"} size={48} color="#D1D5DB" />
               <Text style={styles.emptyText}>
-                {activeTab === 'posts' ? "You haven't posted anything yet." : "You haven't commented on anything yet."}
+                {activeTab === 'posts' ? "You haven't created any posts yet." : "You haven't made any comments yet."}
               </Text>
             </View>
           }
         />
       )}
 
-      {/* --- EDIT PROFILE MODAL --- */}
-      <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: '#fff' }}>
-          
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator size="small" color="#0088cc" /> : <Text style={styles.saveText}>Save</Text>}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.avatarEditContainer}>
-              <Image 
-                source={{ uri: newAvatar || user?.profileUrl || 'https://via.placeholder.com/150' }} 
-                style={styles.avatarEdit} 
-              />
-              <TouchableOpacity onPress={pickImage} style={styles.changePhotoBtn}>
-                <Text style={styles.changePhotoText}>Change Profile Photo</Text>
+      {/* 4. EDIT PROFILE MODAL */}
+      <Modal visible={isEditModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionLabel}>BASIC INFO</Text>
-            <View style={styles.inputGroup}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <View style={styles.imageEditContainer}>
+                <Image source={{ uri: newProfileImage || displayAvatar }} style={styles.editAvatar} />
+                <TouchableOpacity style={styles.changePhotoBtn} onPress={pickImage}>
+                  <Ionicons name="camera" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.inputLabel}>Name</Text>
-              <TextInput style={styles.input} value={editName} onChangeText={setEditName} />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Profession/Bio</Text>
-              <TextInput style={styles.input} value={editProfession} onChangeText={setEditProfession} placeholder="What do you do?" />
-            </View>
+              <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Your Name" />
 
-            <Text style={[styles.sectionLabel, { marginTop: 20 }]}>SECURITY (Leave blank to keep current)</Text>
-            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Profession</Text>
+              <TextInput style={styles.input} value={editProfession} onChangeText={setEditProfession} placeholder="e.g. Software Engineer" />
+
+              <View style={styles.divider} />
+              <Text style={styles.sectionTitle}>Change Password</Text>
+              
               <Text style={styles.inputLabel}>Old Password</Text>
-              <TextInput style={styles.input} value={oldPassword} onChangeText={setOldPassword} secureTextEntry placeholder="Required to change password" />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>New Password</Text>
-              <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="New secure password" />
-            </View>
+              <TextInput style={styles.input} value={oldPassword} onChangeText={setOldPassword} secureTextEntry placeholder="Enter old password" />
 
-          </ScrollView>
+              <Text style={styles.inputLabel}>New Password</Text>
+              <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Enter new password" />
+
+              <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateProfile} disabled={isSubmitting}>
+                {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
-  navBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  navTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
   
-  headerContainer: { backgroundColor: '#fff', paddingTop: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, paddingHorizontal: 20 },
-  profileAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eee' },
-  statsContainer: { flex: 1, flexDirection: 'row', justifyContent: 'space-evenly', marginLeft: 20 },
-  statBox: { alignItems: 'center' },
-  statNumber: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  statLabel: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  // Header Styles
+  header: { backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 15, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
   
-  profileName: { fontSize: 18, fontWeight: '800', color: '#111827', paddingHorizontal: 20 },
-  profileHandle: { fontSize: 15, color: '#6B7280', marginTop: 2, paddingHorizontal: 20 },
-  profileBio: { fontSize: 15, color: '#374151', marginTop: 10, lineHeight: 22, paddingHorizontal: 20 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FEF2F2', borderRadius: 20 },
+  logoutText: { color: '#E0245E', fontWeight: '700', fontSize: 14, marginLeft: 6 },
   
-  actionButtons: { flexDirection: 'row', marginTop: 15, paddingHorizontal: 20 },
-  editBtn: { flex: 1, backgroundColor: '#F3F4F6', paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginRight: 10 },
-  editBtnText: { color: '#111827', fontWeight: '700', fontSize: 14 },
-  logoutBtn: { flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#FECACA' },
-  logoutBtnText: { color: '#EF4444', fontWeight: '700', fontSize: 14 },
+  profileInfoContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  profileAvatar: { width: 74, height: 74, borderRadius: 37, backgroundColor: '#E5E7EB', marginRight: 15 },
+  profileTextContainer: { flex: 1 },
+  profileName: { fontSize: 20, fontWeight: '700', color: '#111827' },
+  profileHandle: { fontSize: 15, color: '#6B7280', marginBottom: 6 },
+  professionBadge: { alignSelf: 'flex-start', backgroundColor: '#E0F2FE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  professionText: { color: '#0284C7', fontSize: 12, fontWeight: '700' },
+  
+  // Follower / Following Stats
+  socialStatsRow: { flexDirection: 'row', backgroundColor: '#F9FAFB', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6', marginBottom: 14, justifyContent: 'space-around', alignItems: 'center' },
+  statBox: { flex: 1, alignItems: 'center' },
+  statCount: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  statLabel: { fontSize: 13, color: '#6B7280', fontWeight: '500', marginTop: 2 },
+  statDivider: { width: 1, height: 24, backgroundColor: '#E5E7EB' },
 
-  // Tabs
-  tabContainer: { flexDirection: 'row', marginTop: 20, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  tab: { flex: 1, paddingVertical: 15, alignItems: 'center' },
-  activeTab: { borderBottomWidth: 2, borderBottomColor: '#0088cc' },
+  editProfileBtn: { width: '100%', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', backgroundColor: '#F9FAFB' },
+  editProfileBtnText: { color: '#374151', fontSize: 15, fontWeight: '700' },
+
+  // Tab Styles
+  tabContainer: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  tabBtn: { flex: 1, paddingVertical: 15, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTabBtn: { borderBottomColor: '#0088cc' },
   tabText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
-  activeTabText: { color: '#0088cc', fontWeight: '800' },
+  activeTabText: { color: '#0088cc' },
 
-  // Comment Card
-  commentCard: { backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  commentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  commentPostTitle: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginLeft: 6, flex: 1 },
-  commentContent: { fontSize: 15, color: '#111827', lineHeight: 22 },
+  // Feed Layout Overlap Protection
+  feedScrollPadding: { paddingBottom: 110, paddingTop: 6 },
 
-  emptyState: { alignItems: 'center', marginTop: 50 },
-  emptyText: { marginTop: 10, color: '#9CA3AF', fontSize: 16 },
+  // Empty State Styles
+  emptyContainer: { alignItems: 'center', marginTop: 60, paddingHorizontal: 20 },
+  emptyText: { fontSize: 16, color: '#9CA3AF', marginTop: 15, textAlign: 'center', fontWeight: '500' },
+
+  // Comment Card Cardboards
+  commentCard: { backgroundColor: '#fff', padding: 15, marginHorizontal: 15, marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
+  commentPostTitle: { fontSize: 13, color: '#0088cc', marginBottom: 8, fontWeight: '700' },
+  commentContentBox: { backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB' },
+  commentText: { fontSize: 15, color: '#374151', lineHeight: 22 },
 
   // Modal Styles
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  cancelText: { fontSize: 16, color: '#111827' },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  saveText: { fontSize: 16, color: '#0088cc', fontWeight: '700' },
-  modalBody: { padding: 20 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: '#fff', height: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 22, fontWeight: '800', color: '#111827' },
+  modalScroll: { paddingBottom: 40 },
   
-  avatarEditContainer: { alignItems: 'center', marginVertical: 20 },
-  avatarEdit: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#eee', marginBottom: 10 },
-  changePhotoBtn: { padding: 5 },
-  changePhotoText: { color: '#0088cc', fontWeight: '600', fontSize: 15 },
+  imageEditContainer: { alignSelf: 'center', position: 'relative', marginBottom: 25, marginTop: 10 },
+  editAvatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#E5E7EB' },
+  changePhotoBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#0088cc', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#fff' },
   
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginBottom: 10, letterSpacing: 1 },
-  inputGroup: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingVertical: 12 },
-  inputLabel: { width: 120, fontSize: 16, color: '#111827' },
-  input: { flex: 1, fontSize: 16, color: '#374151' }
+  divider: { height: 1, backgroundColor: '#E5E7EB', marginVertical: 25 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 15 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 },
+  input: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15, color: '#111827', marginBottom: 16 },
+  
+  saveBtn: { backgroundColor: '#0088cc', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, shadowColor: '#0088cc', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' }
 });

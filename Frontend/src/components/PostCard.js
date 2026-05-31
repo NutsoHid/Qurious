@@ -1,20 +1,40 @@
-import React, { useState, useContext } from 'react';
+import React, { useContext } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api'; 
 
-export default function PostCard({ post, disableProfileClick = false, onOpenComments, onPostDeleted }) {
+const formatSocialDate = (dateInput) => {
+  if (!dateInput) return '';
+  const now = new Date();
+  const posted = new Date(dateInput);
+  const diffInSeconds = Math.floor((now - posted) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m`;
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d`;
+
+  return posted.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+export default function PostCard({ post, disableProfileClick = false, onOpenComments, onPostDeleted, onVote }) {
   const navigation = useNavigation();
   const { user: currentUser } = useContext(AuthContext);
   
-  const initialIsLiked = post.likes?.includes(currentUser?._id) || false;
-  const initialLikesCount = post.likes?.length || 0;
-
-  const [isLiked, setIsLiked] = useState(initialIsLiked);
-  const [likesCount, setLikesCount] = useState(initialLikesCount);
-  const [isLiking, setIsLiking] = useState(false);
+  const voteState = post.likes?.includes(currentUser?._id) 
+    ? 'like' 
+    : (post.dislikes?.includes(currentUser?._id) ? 'dislike' : null);
+  
+  const likesCount = post.likes?.length || 0;
+  const dislikesCount = post.dislikes?.length || 0;
 
   const authorName = post.anonymous ? 'Anonymous' : (post.user?.name || 'Unknown User');
   const authorHandle = post.anonymous ? '@hidden' : (post.user?.userName || 'unknown');
@@ -24,6 +44,23 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
 
   const isOwner = currentUser?._id === post.user?._id;
   const isAdmin = currentUser?.accountType === 'admin';
+  const totalComments = post.comments ? post.comments.length : 0;
+
+  // 🔥 NEW: Dynamic Category Badge Colors for the Feed
+  const getCategoryBadgeStyle = (cat) => {
+    switch(cat) {
+      case 'Health': 
+        return { bg: '#FEE2E2', text: '#EF4444' }; // Soft Red background, Solid Red text
+      case 'Education': 
+        return { bg: '#E0F2FE', text: '#0088cc' }; // Soft Blue background, Solid Blue text
+      case 'Social': 
+        return { bg: '#D1FAE5', text: '#10B981' }; // Soft Green background, Solid Green text
+      default: 
+        return { bg: '#E0F2FE', text: '#0088cc' }; // Fallback Blue
+    }
+  };
+
+  const badgeColors = getCategoryBadgeStyle(post.category);
 
   const handleProfileClick = () => {
     if (disableProfileClick || post.anonymous || !post.user) return;
@@ -34,23 +71,6 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
     }
   };
 
-  const handleLike = async () => {
-    setIsLiked(!isLiked);
-    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
-    setIsLiking(true);
-
-    try {
-      await api.post(`/post/like/${post._id}`);
-    } catch (error) {
-      console.log("Error liking post:", error);
-      setIsLiked(isLiked);
-      setLikesCount(likesCount);
-    } finally {
-      setIsLiking(false);
-    }
-  };
-
-  // 👇 NEW: Options Menu (Delete or Report)
   const handleOptions = () => {
     if (isOwner || isAdmin) {
       Alert.alert("Post Options", "What would you like to do?", [
@@ -61,7 +81,7 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
           onPress: async () => {
             try {
               await api.delete(`/post/deletePost/${post._id}`);
-              if(onPostDeleted) onPostDeleted(post._id); // Instantly removes it from the screen
+              if(onPostDeleted) onPostDeleted(post._id); 
               Alert.alert("Deleted", "Your post has been removed.");
             } catch (error) {
               Alert.alert("Error", "Could not delete post.");
@@ -97,18 +117,25 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
         >
           <Image source={{ uri: profileImage }} style={styles.avatar} />
           <View>
-            <Text style={styles.name}>{authorName}</Text>
+            <View style={styles.titleInfoRow}>
+              <Text style={styles.name} numberOfLines={1}>{authorName}</Text>
+              <Text style={styles.dotDivider}>•</Text>
+              <Text style={styles.timestamp}>{formatSocialDate(post.createdAt)}</Text>
+            </View>
             <Text style={styles.handle}>@{authorHandle}</Text>
           </View>
         </TouchableOpacity>
         
         <View style={styles.rightHeader}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{post.category || 'Social'}</Text>
+          {/* 🔥 APPLIED DYNAMIC CATEGORY STYLES HERE */}
+          <View style={[styles.categoryBadge, { backgroundColor: badgeColors.bg }]}>
+            <Text style={[styles.categoryText, { color: badgeColors.text }]}>
+              {post.category || 'Social'}
+            </Text>
           </View>
-          {/* 👇 NEW: Three Dots Icon */}
+
           <TouchableOpacity onPress={handleOptions} style={styles.optionsBtn}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#888" />
+            <Ionicons name="ellipsis-vertical" size={18} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -123,42 +150,74 @@ export default function PostCard({ post, disableProfileClick = false, onOpenComm
       ) : null}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleLike} disabled={isLiking}>
-          <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#E0245E" : "#666"} />
-          <Text style={[styles.actionText, isLiked && { color: "#E0245E" }]}>
-             {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
+        
+        {/* UPVOTE BUTTON PILL */}
+        <TouchableOpacity 
+          style={[styles.pillButton, voteState === 'like' && styles.activeLikePill]} 
+          onPress={() => onVote && onVote(true)}
+        >
+          <Ionicons 
+            name={voteState === 'like' ? "arrow-up-circle" : "arrow-up-circle-outline"} 
+            size={20} 
+            color={voteState === 'like' ? "#0088cc" : "#4B5563"} 
+          />
+          <Text style={[styles.pillText, voteState === 'like' && styles.activeLikeText]}>
+             {likesCount}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn} onPress={onOpenComments}>
-          <Ionicons name="chatbubble-outline" size={22} color="#666" />
-          <Text style={styles.actionText}>Comment</Text>
+        {/* DOWNVOTE BUTTON PILL */}
+        <TouchableOpacity 
+          style={[styles.pillButton, voteState === 'dislike' && styles.activeDislikePill]} 
+          onPress={() => onVote && onVote(false)}
+        >
+          <Ionicons 
+            name={voteState === 'dislike' ? "arrow-down-circle" : "arrow-down-circle-outline"} 
+            size={20} 
+            color={voteState === 'dislike' ? "#EF4444" : "#4B5563"} 
+          />
+          <Text style={[styles.pillText, voteState === 'dislike' && styles.activeDislikeText]}>
+             {dislikesCount}
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn}>
-          <Ionicons name="share-social-outline" size={22} color="#666" />
+        {/* COMMENT BUTTON PILL */}
+        <TouchableOpacity style={styles.pillButton} onPress={onOpenComments}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#4B5563" />
+          <Text style={styles.pillText}>{totalComments}</Text>
         </TouchableOpacity>
+        
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#fff', marginBottom: 10, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, marginBottom: 12 },
+  card: { backgroundColor: '#fff', marginBottom: 10, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 },
   rightHeader: { flexDirection: 'row', alignItems: 'center' },
-  optionsBtn: { paddingLeft: 10 },
+  optionsBtn: { paddingLeft: 12 },
   authorInfo: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: '#eee' },
-  name: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
-  handle: { fontSize: 14, color: '#888' },
-  categoryBadge: { backgroundColor: '#e6f4ff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  categoryText: { color: '#0088cc', fontSize: 12, fontWeight: '600' },
-  contentContainer: { paddingHorizontal: 15, marginBottom: 12 },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 6 },
-  content: { fontSize: 15, color: '#444', lineHeight: 22 },
-  postImage: { width: '100%', height: 250, marginBottom: 12 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingTop: 5 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', marginRight: 25 },
-  actionText: { marginLeft: 6, fontSize: 14, color: '#666', fontWeight: '500' }
+  avatar: { width: 42, height: 42, borderRadius: 21, marginRight: 12, backgroundColor: '#f3f4f6' },
+  titleInfoRow: { flexDirection: 'row', alignItems: 'center' },
+  name: { fontSize: 15, fontWeight: '700', color: '#111827', maxWidth: 140 },
+  dotDivider: { fontSize: 14, color: '#6B7280', marginHorizontal: 6 },
+  timestamp: { fontSize: 13, color: '#6B7280', fontWeight: '400' },
+  handle: { fontSize: 13, color: '#6B7280', marginTop: 1 },
+  
+  // Notice background and text colors are removed here because they are applied inline dynamically
+  categoryBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  categoryText: { fontSize: 12, fontWeight: '700' },
+  
+  contentContainer: { paddingHorizontal: 16, marginBottom: 12 },
+  title: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  content: { fontSize: 14.5, color: '#374151', lineHeight: 21 },
+  postImage: { width: '100%', height: 260, marginBottom: 12 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 4 },
+  pillButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 10 },
+  pillText: { marginLeft: 6, fontSize: 13, color: '#374151', fontWeight: '600' },
+  activeLikePill: { backgroundColor: '#e0f2fe' },
+  activeLikeText: { color: '#0088cc' },
+  activeDislikePill: { backgroundColor: '#fee2e2' },
+  activeDislikeText: { color: '#ef4444' }
 });
